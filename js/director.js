@@ -1,10 +1,10 @@
 /**
- * 《今天也不想上班》- 刷怪导演与模块化关卡系统 (V1.7 Bug修复与武器池扩展版)
+ * 《今天也不想上班》- 刷怪导演与模块化关卡系统 (V1.8 地图事件与移动端横屏优化版)
  */
 
-import { STAGES_CONFIG, NORMAL_ENEMIES, ELITES, RANDOM_BOSS_ROSTER } from './constants.js?v=1.7';
-import { Enemy, Elite, createBossInstance } from './entities.js?v=1.7';
-import { sound } from './audio.js?v=1.7';
+import { STAGES_CONFIG, NORMAL_ENEMIES, ELITES, RANDOM_BOSS_ROSTER } from './constants.js?v=1.8';
+import { Enemy, Elite, createBossInstance } from './entities.js?v=1.8';
+import { sound } from './audio.js?v=1.8';
 
 export class WaveDirector {
   constructor(game) {
@@ -80,13 +80,17 @@ export class WaveDirector {
       this.spawnElite("pm");
     }
 
-    // 关卡中期随机强力Boss突袭 (220s)
-    if (!this.midBossSpawned && this.gameTime >= 220 && !this.bossSpawned) {
+    // 标准关卡不再提前刷随机Boss。中期只增加精英压力，避免误认为关底Boss提前出现。
+    if (!this.midBossSpawned && this.gameTime >= 240 && !this.bossSpawned) {
       this.midBossSpawned = true;
-      this.spawnRandomInvasionBoss();
+      const eliteId = Math.random() < 0.5 ? "hr" : "pm";
+      this.spawnElite(eliteId);
+      if (this.game.player) {
+        this.game.addFloatingText(this.game.player.x, this.game.player.y - 48, "⚠️ 中期精英增援到达", "#f59e0b", 17);
+      }
     }
 
-    // 关底最终Boss登场
+    // 关底最终Boss只在关卡计时达到8:00后登场，并严格使用当前关卡Boss配置。
     if (!this.bossSpawned && this.gameTime >= this.stageConfig.duration) {
       this.bossSpawned = true;
       this.spawnBoss();

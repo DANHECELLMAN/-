@@ -1,5 +1,5 @@
 /**
- * 《今天也不想上班》- 核心数值常量与配置表 (V1.7 Bug修复与武器池扩展版)
+ * 《今天也不想上班》- 核心数值常量与配置表 (V1.8 地图事件与移动端横屏优化版)
  */
 
 export const M_TO_PX = 32;
@@ -936,8 +936,8 @@ export const STAGES_CONFIG = {
     subtitle: "工位、茶水间与打印机的无限加班地狱",
     bgFloor: "#1e293b",
     gridColor: "#334155",
-    mapWidth: 48 * M_TO_PX,
-    mapHeight: 36 * M_TO_PX,
+    mapWidth: 72 * M_TO_PX,
+    mapHeight: 52 * M_TO_PX,
     duration: 480,
     unlockReqText: "初始已解锁",
     boss: {
@@ -969,8 +969,8 @@ export const STAGES_CONFIG = {
     subtitle: "连环对齐会与抓不住重点的PPT风暴",
     bgFloor: "#1a2238",
     gridColor: "#2a3b5c",
-    mapWidth: 50 * M_TO_PX,
-    mapHeight: 38 * M_TO_PX,
+    mapWidth: 74 * M_TO_PX,
+    mapHeight: 54 * M_TO_PX,
     duration: 480,
     unlockReqText: "通关【星期一】解锁",
     boss: {
@@ -999,8 +999,8 @@ export const STAGES_CONFIG = {
     subtitle: "改稿无底洞与“五彩斑斓的黑”",
     bgFloor: "#241c2c",
     gridColor: "#3d2a4a",
-    mapWidth: 50 * M_TO_PX,
-    mapHeight: 38 * M_TO_PX,
+    mapWidth: 74 * M_TO_PX,
+    mapHeight: 54 * M_TO_PX,
     duration: 480,
     unlockReqText: "通关【星期二】解锁",
     boss: {
@@ -1029,8 +1029,8 @@ export const STAGES_CONFIG = {
     subtitle: "夺命连环Call与全天候电波轰炸",
     bgFloor: "#091e28",
     gridColor: "#133544",
-    mapWidth: 52 * M_TO_PX,
-    mapHeight: 40 * M_TO_PX,
+    mapWidth: 76 * M_TO_PX,
+    mapHeight: 56 * M_TO_PX,
     duration: 480,
     unlockReqText: "通关【星期三】解锁",
     boss: {
@@ -1059,8 +1059,8 @@ export const STAGES_CONFIG = {
     subtitle: "大饼画满天、期权全画饼的终极资本家",
     bgFloor: "#23180c",
     gridColor: "#3d2a14",
-    mapWidth: 52 * M_TO_PX,
-    mapHeight: 40 * M_TO_PX,
+    mapWidth: 76 * M_TO_PX,
+    mapHeight: 56 * M_TO_PX,
     duration: 480,
     unlockReqText: "通关【星期四】解锁",
     boss: {
@@ -1089,8 +1089,8 @@ export const STAGES_CONFIG = {
     subtitle: "打着放松旗号的折磨爬山与狼性拓展",
     bgFloor: "#142316",
     gridColor: "#1d3820",
-    mapWidth: 54 * M_TO_PX,
-    mapHeight: 42 * M_TO_PX,
+    mapWidth: 78 * M_TO_PX,
+    mapHeight: 58 * M_TO_PX,
     duration: 480,
     unlockReqText: "通关【星期五】解锁",
     boss: {
@@ -1119,8 +1119,8 @@ export const STAGES_CONFIG = {
     subtitle: "没有下班时间！怪物随时间无限狂暴增长，随机强力Boss轮番突袭！",
     bgFloor: "#0f172a",
     gridColor: "#1e293b",
-    mapWidth: 56 * M_TO_PX,
-    mapHeight: 44 * M_TO_PX,
+    mapWidth: 82 * M_TO_PX,
+    mapHeight: 60 * M_TO_PX,
     duration: Infinity,
     isEndless: true,
     unlockReqText: "通关【星期一】即可开启无尽挑战",

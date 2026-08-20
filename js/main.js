@@ -1,9 +1,9 @@
 /**
- * 《今天也不想上班》- 程序启动与全平台UI事件绑定 (V1.7 Bug修复与武器池扩展版)
+ * 《今天也不想上班》- 程序启动与全平台UI事件绑定 (V1.8 地图事件与移动端横屏优化版)
  */
 
-import { GameEngine } from './game.js?v=1.7';
-import { sound } from './audio.js?v=1.7';
+import { GameEngine } from './game.js?v=1.8';
+import { sound } from './audio.js?v=1.8';
 
 window.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('game-canvas');
@@ -163,6 +163,16 @@ window.addEventListener('DOMContentLoaded', () => {
       game.showMobileControls = !game.showMobileControls;
       document.getElementById('mobile-controls').style.display = (game.showMobileControls && game.state === 'PLAYING') ? 'block' : 'none';
       controlsBtn.innerText = game.showMobileControls ? '🎮 虚拟摇杆: 开' : '🎮 虚拟摇杆: 关';
+    };
+  }
+
+  const landscapeBtn = document.getElementById('btn-landscape-mode');
+  if (landscapeBtn) {
+    landscapeBtn.onclick = async () => {
+      sound.init();
+      sound.playClick();
+      await game.requestLandscapeMode();
+      landscapeBtn.innerText = (window.innerWidth > window.innerHeight) ? '📱 已进入横屏' : '📱 请旋转手机横屏';
     };
   }
 

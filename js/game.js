@@ -1,11 +1,11 @@
 /**
- * 《今天也不想上班》- 核心游戏引擎与状态机 (V1.7 Bug修复与武器池扩展版)
+ * 《今天也不想上班》- 核心游戏引擎与状态机 (V1.8 地图事件与移动端横屏优化版)
  */
 
-import { M_TO_PX, CHARACTERS, PLAYER_BASE, PRESSURE_STAGES, WEAPONS, SKILLS, ARTIFACTS, UPGRADE_SYSTEM, TALENTS, STAGES_CONFIG } from './constants.js?v=1.7';
-import { Player, DamageNumber, FloatingText, Particle, DropItem, Projectile, AOEZone, TerrainObstacle, createBossInstance } from './entities.js?v=1.7';
-import { WaveDirector } from './director.js?v=1.7';
-import { sound } from './audio.js?v=1.7';
+import { M_TO_PX, CHARACTERS, PLAYER_BASE, PRESSURE_STAGES, WEAPONS, SKILLS, ARTIFACTS, UPGRADE_SYSTEM, TALENTS, STAGES_CONFIG } from './constants.js?v=1.8';
+import { Player, DamageNumber, FloatingText, Particle, DropItem, Projectile, AOEZone, TerrainObstacle, createBossInstance } from './entities.js?v=1.8';
+import { WaveDirector } from './director.js?v=1.8';
+import { sound } from './audio.js?v=1.8';
 
 export class GameEngine {
   constructor(canvas) {
@@ -42,6 +42,11 @@ export class GameEngine {
     this.showMobileControls = true;
     this.freeRerollAvailable = true;
     this.activeUpgradeTab = "character"; // "character" 或 "weapon"
+    this.mapZones = [];
+    this.zoneEvents = [];
+    this.upgradeOfferHistory = [];
+    this.upgradeOfferCounter = 0;
+    this._resizeRaf = 0;
 
     this.initCanvasSize();
     this.initEventListeners();
@@ -80,20 +85,44 @@ export class GameEngine {
   }
 
   initCanvasSize() {
-    const dpr = window.devicePixelRatio || 1;
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    this.canvas.width = width * dpr;
-    this.canvas.height = height * dpr;
+    const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+    const width = Math.max(320, window.innerWidth);
+    const height = Math.max(240, window.innerHeight);
+    this.canvas.width = Math.round(width * dpr);
+    this.canvas.height = Math.round(height * dpr);
     this.canvas.style.width = width + 'px';
     this.canvas.style.height = height + 'px';
-    this.ctx.scale(dpr, dpr);
+    // 关键修复：每次 resize/orientationchange 都重置 transform，避免 DPR 缩放重复累乘导致地图突然放大/缩小。
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.viewWidth = width;
     this.viewHeight = height;
   }
 
+  scheduleCanvasResize() {
+    if (this._resizeRaf) cancelAnimationFrame(this._resizeRaf);
+    this._resizeRaf = requestAnimationFrame(() => {
+      this._resizeRaf = 0;
+      this.initCanvasSize();
+    });
+  }
+
+  async requestLandscapeMode() {
+    try {
+      if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch (e) {}
+    try {
+      if (screen.orientation && screen.orientation.lock) {
+        await screen.orientation.lock('landscape');
+      }
+    } catch (e) {}
+    setTimeout(() => this.initCanvasSize(), 180);
+  }
+
   initEventListeners() {
-    window.addEventListener('resize', () => this.initCanvasSize());
+    window.addEventListener('resize', () => this.scheduleCanvasResize());
+    window.addEventListener('orientationchange', () => setTimeout(() => this.initCanvasSize(), 220));
 
     window.addEventListener('keydown', (e) => {
       this.keys[e.code] = true;
@@ -187,6 +216,9 @@ export class GameEngine {
     this.freeRerollAvailable = true;
 
     this.director.setStage(this.selectedStageId);
+    this.initOfficeZones();
+    this.upgradeOfferHistory = [];
+    this.upgradeOfferCounter = 0;
 
     document.getElementById('hud').style.display = 'block';
     document.getElementById('main-menu').style.display = 'none';
@@ -196,6 +228,177 @@ export class GameEngine {
 
     this.state = 'PLAYING';
     sound.startBgm();
+  }
+
+  initOfficeZones() {
+    const cols = 3, rows = 2;
+    const labelsByStage = {
+      stage_1: ["前台接待区", "开放工位A", "打印复印区", "开放工位B", "茶水间", "会议室"],
+      stage_2: ["小会议室", "大会议室", "PPT准备区", "视频会议区", "休息走廊", "资料室"],
+      stage_3: ["客户前厅", "提案区", "改稿工位", "审稿区", "休息角", "客户会议室"],
+      stage_4: ["电话坐席A", "电话坐席B", "通信机房", "运营工位", "茶水间", "应急会议区"],
+      stage_5: ["董事前厅", "高管工位", "财务资料区", "战略会议室", "休息区", "CEO办公室"],
+      stage_6: ["签到区", "训练区", "物资区", "团建休息区", "宣誓区", "考核场"],
+      stage_endless: ["夜班工位A", "夜班工位B", "服务器区", "空会议室", "自动售货区", "通宵休息角"]
+    };
+    const labels = labelsByStage[this.selectedStageId] || labelsByStage.stage_1;
+    const pad = 44;
+    const zoneW = this.mapWidth / cols;
+    const zoneH = this.mapHeight / rows;
+    this.mapZones = [];
+    this.zoneEvents = [];
+    let idx = 0;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const zone = {
+          id: `zone_${idx}`,
+          name: labels[idx] || `办公区${idx + 1}`,
+          x: c * zoneW,
+          y: r * zoneH,
+          w: zoneW,
+          h: zoneH,
+          index: idx
+        };
+        this.mapZones.push(zone);
+        const ex = zone.x + pad + Math.random() * Math.max(20, zone.w - pad * 2);
+        const ey = zone.y + pad + Math.random() * Math.max(20, zone.h - pad * 2);
+        this.zoneEvents.push({
+          zoneId: zone.id,
+          x: ex,
+          y: ey,
+          type: Math.random() < 0.52 ? 'weapon' : 'xp',
+          active: false,
+          respawn: 8 + Math.random() * 28,
+          pulse: Math.random() * Math.PI * 2
+        });
+        idx++;
+      }
+    }
+  }
+
+  updateZoneEvents(dt) {
+    if (!this.player || this.director?.bossSpawned) return;
+    for (const ev of this.zoneEvents) {
+      ev.pulse += dt * 3;
+      if (!ev.active) {
+        ev.respawn -= dt;
+        if (ev.respawn <= 0) ev.active = true;
+        continue;
+      }
+      const dist = Math.hypot(this.player.x - ev.x, this.player.y - ev.y);
+      if (dist <= this.player.radius + 24) {
+        this.claimZoneEvent(ev);
+      }
+    }
+  }
+
+  claimZoneEvent(ev) {
+    const zone = this.mapZones.find(z => z.id === ev.zoneId);
+    ev.active = false;
+    ev.respawn = 70 + Math.random() * 50;
+    if (zone) {
+      const pad = 52;
+      ev.x = zone.x + pad + Math.random() * Math.max(20, zone.w - pad * 2);
+      ev.y = zone.y + pad + Math.random() * Math.max(20, zone.h - pad * 2);
+    }
+    if (ev.type === 'weapon') {
+      const eligible = Object.keys(WEAPONS).filter(k => WEAPONS[k]?.levels && k !== 'ac_fusion_evo' && (this.player.weapons[k] || 0) < 5);
+      const unowned = eligible.filter(k => !(this.player.weapons[k] > 0));
+      const source = unowned.length ? unowned : eligible;
+      if (source.length) {
+        const rarityWeight = { common: 44, rare: 32, epic: 18, legendary: 6 };
+        const groups = {};
+        for (const key of source) (groups[WEAPONS[key].rarity || 'common'] ||= []).push(key);
+        const rs = Object.keys(groups);
+        let total = rs.reduce((sum, r) => sum + (rarityWeight[r] || 1), 0);
+        let roll = Math.random() * total;
+        let chosenRarity = rs[0];
+        for (const r of rs) { roll -= rarityWeight[r] || 1; if (roll <= 0) { chosenRarity = r; break; } }
+        const bucket = groups[chosenRarity];
+        const k = bucket[Math.floor(Math.random() * bucket.length)];
+        this.player.weapons[k] = (this.player.weapons[k] || 0) + 1;
+        this.addFloatingText(this.player.x, this.player.y - 42, `🗃️ ${zone?.name || '办公区'}事件：获得 ${WEAPONS[k].name} Lv.${this.player.weapons[k]}`, '#fbbf24', 17);
+        sound.playUpgrade();
+      } else {
+        const xp = Math.max(24, Math.round(this.player.xpNeeded * 0.55));
+        this.player.addXp(xp);
+        this.addFloatingText(this.player.x, this.player.y - 42, `📚 武器已满：经验 +${xp}`, '#38bdf8', 17);
+        sound.playXp();
+      }
+    } else {
+      const xp = Math.max(18, Math.round(this.player.xpNeeded * (0.32 + Math.random() * 0.18)));
+      this.player.addXp(xp);
+      this.addFloatingText(this.player.x, this.player.y - 42, `📚 ${zone?.name || '办公区'}事件：经验 +${xp}`, '#38bdf8', 17);
+      sound.playXp();
+    }
+    ev.type = Math.random() < 0.52 ? 'weapon' : 'xp';
+  }
+
+  drawOfficeMap(ctx, stageConf) {
+    ctx.fillStyle = stageConf.bgFloor || '#1e293b';
+    ctx.fillRect(0, 0, this.mapWidth, this.mapHeight);
+    const alt = ['rgba(255,255,255,0.025)','rgba(56,189,248,0.035)','rgba(168,85,247,0.03)','rgba(16,185,129,0.03)','rgba(251,191,36,0.025)','rgba(244,63,94,0.025)'];
+    for (const z of this.mapZones) {
+      ctx.fillStyle = alt[z.index % alt.length];
+      ctx.fillRect(z.x + 5, z.y + 5, z.w - 10, z.h - 10);
+      ctx.strokeStyle = 'rgba(148,163,184,0.22)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(z.x + 6, z.y + 6, z.w - 12, z.h - 12);
+      ctx.fillStyle = 'rgba(226,232,240,0.38)';
+      ctx.font = 'bold 18px Arial';
+      ctx.textAlign = 'left';
+      ctx.fillText(z.name, z.x + 20, z.y + 30);
+      // 办公桌/隔断装饰，不参与碰撞，恢复办公室布局感。
+      const deskCount = 5 + (z.index % 3);
+      for (let i = 0; i < deskCount; i++) {
+        const dx = z.x + 70 + ((i * 137 + z.index * 43) % Math.max(150, z.w - 150));
+        const dy = z.y + 90 + ((i * 91 + z.index * 67) % Math.max(140, z.h - 150));
+        ctx.fillStyle = 'rgba(100,116,139,0.32)';
+        ctx.fillRect(dx, dy, 54, 24);
+        ctx.fillStyle = 'rgba(15,23,42,0.38)';
+        ctx.fillRect(dx + 8, dy + 4, 18, 12);
+        ctx.strokeStyle = 'rgba(203,213,225,0.16)';
+        ctx.strokeRect(dx, dy, 54, 24);
+      }
+    }
+    // 主通道
+    ctx.fillStyle = 'rgba(148,163,184,0.06)';
+    ctx.fillRect(0, this.mapHeight / 2 - 28, this.mapWidth, 56);
+    ctx.fillRect(this.mapWidth / 3 - 20, 0, 40, this.mapHeight);
+    ctx.fillRect(this.mapWidth * 2 / 3 - 20, 0, 40, this.mapHeight);
+  }
+
+  drawZoneEvents(ctx) {
+    for (const ev of this.zoneEvents) {
+      if (!ev.active) continue;
+      const pulse = 1 + Math.sin(ev.pulse) * 0.08;
+      ctx.save();
+      ctx.translate(ev.x, ev.y);
+      ctx.scale(pulse, pulse);
+      ctx.shadowBlur = 18;
+      ctx.shadowColor = ev.type === 'weapon' ? '#fbbf24' : '#38bdf8';
+      ctx.fillStyle = ev.type === 'weapon' ? 'rgba(251,191,36,0.18)' : 'rgba(56,189,248,0.18)';
+      ctx.beginPath(); ctx.arc(0, 0, 24, 0, Math.PI * 2); ctx.fill();
+      ctx.font = '26px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(ev.type === 'weapon' ? '🗃️' : '📚', 0, 0);
+      ctx.restore();
+    }
+  }
+
+  drawBossHud() {
+    const boss = this.bossInstance;
+    if (!boss || !boss.alive) return;
+    const ctx = this.ctx;
+    const w = Math.min(420, Math.max(240, this.viewWidth * 0.42));
+    const x = (this.viewWidth - w) / 2;
+    const y = 46;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.fillRect(x, y, w, 15);
+    ctx.fillStyle = boss.color || '#ef4444'; ctx.fillRect(x, y, w * Math.max(0, boss.hp / boss.maxHp), 15);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.strokeRect(x, y, w, 15);
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 12px Arial'; ctx.textAlign = 'center';
+    ctx.fillText(`【${boss.conf?.title || 'Boss'}】${boss.name}  ${Math.max(0, Math.round(boss.hp))}/${boss.maxHp}  P${boss.currentPhase || 1}`, this.viewWidth / 2, y - 6);
+    ctx.restore();
   }
 
   pauseGame() {
@@ -320,6 +523,13 @@ export class GameEngine {
     let total = 0;
     const weighted = candidates.map(item => {
       let weight = Math.max(0.01, item.weight || 1);
+      const itemKey = `${item.type}:${item.id}`;
+      const recentIndex = this.upgradeOfferHistory.lastIndexOf(itemKey);
+      if (recentIndex >= 0) {
+        const distance = this.upgradeOfferHistory.length - recentIndex;
+        weight *= distance <= 4 ? 0.18 : (distance <= 8 ? 0.45 : 0.75);
+      }
+      if (item.type === 'WEAPON' && item.currentLevel === 0) weight *= 1.25;
       if (this.player?.characterId === "xiaozhang" && (item.rarity === "epic" || item.rarity === "legendary")) {
         weight *= 1.45;
       }
@@ -334,9 +544,37 @@ export class GameEngine {
     return weighted[weighted.length - 1].item;
   }
 
+  pickNewWeaponDiverse(pool, excludeKeys = new Set()) {
+    const candidates = pool.filter(item => !excludeKeys.has(`${item.type}:${item.id}`));
+    if (!candidates.length) return null;
+    const rarityWeights = { common: 44, rare: 32, epic: 18, legendary: 6 };
+    const groups = {};
+    for (const item of candidates) (groups[item.rarity || 'common'] ||= []).push(item);
+    const rarities = Object.keys(groups);
+    let total = rarities.reduce((sum, r) => sum + (rarityWeights[r] || 1), 0);
+    let roll = Math.random() * total;
+    let selectedRarity = rarities[0];
+    for (const r of rarities) {
+      roll -= rarityWeights[r] || 1;
+      if (roll <= 0) { selectedRarity = r; break; }
+    }
+    const bucket = groups[selectedRarity];
+    const weighted = bucket.map(item => {
+      const key = `${item.type}:${item.id}`;
+      const recentIndex = this.upgradeOfferHistory.lastIndexOf(key);
+      const distance = recentIndex < 0 ? 999 : this.upgradeOfferHistory.length - recentIndex;
+      return { item, weight: distance <= 4 ? 0.15 : (distance <= 8 ? 0.5 : 1) };
+    });
+    let sum = weighted.reduce((a,b) => a + b.weight, 0);
+    let r = Math.random() * sum;
+    for (const entry of weighted) { r -= entry.weight; if (r <= 0) return entry.item; }
+    return weighted[weighted.length - 1].item;
+  }
+
   generateUpgradeChoices() {
     const p = this.player;
     const ownedWeaponUpgrades = [];
+    const newWeaponPool = [];
     const randomPool = [];
 
     // 满足条件的超级进化进入随机池。
@@ -381,7 +619,7 @@ export class GameEngine {
         weight: wConf.dropWeight || meta.weight, currentLevel: curLvl
       };
       if (curLvl > 0) ownedWeaponUpgrades.push(choice);
-      else randomPool.push(choice);
+      else newWeaponPool.push(choice);
     }
 
     // 被动技能进入随机池。
@@ -409,9 +647,15 @@ export class GameEngine {
       used.add(`${guaranteed.type}:${guaranteed.id}`);
     }
 
-    // 另外两个选项在新武器、技能、进化中按权重随机。
+    // 另外两个槽位保持随机，但提高“新武器”曝光率，并对最近出现过的选项降权，避免实战中反复刷同几件。
+    const mixedPool = [...newWeaponPool, ...randomPool];
     while (result.length < 3) {
-      const pick = this.weightedPick(randomPool, used);
+      let source = mixedPool;
+      const availableNew = newWeaponPool.filter(item => !used.has(`${item.type}:${item.id}`));
+      // 约68%概率优先从未拥有武器池抽取；仍然是随机，不固定具体武器。
+      const preferNewWeapon = availableNew.length > 0 && Math.random() < 0.68;
+      if (preferNewWeapon) source = newWeaponPool;
+      const pick = preferNewWeapon ? (this.pickNewWeaponDiverse(newWeaponPool, used) || this.weightedPick(mixedPool, used)) : this.weightedPick(source, used);
       if (!pick) break;
       result.push({ ...pick });
       used.add(`${pick.type}:${pick.id}`);
@@ -429,7 +673,11 @@ export class GameEngine {
       }
     }
 
-    return result.sort(() => Math.random() - 0.5).slice(0, 3);
+    const finalChoices = result.sort(() => Math.random() - 0.5).slice(0, 3);
+    for (const c of finalChoices) this.upgradeOfferHistory.push(`${c.type}:${c.id}`);
+    if (this.upgradeOfferHistory.length > 24) this.upgradeOfferHistory.splice(0, this.upgradeOfferHistory.length - 24);
+    this.upgradeOfferCounter++;
+    return finalChoices;
   }
 
   triggerLevelUpSelection() {
@@ -809,6 +1057,7 @@ export class GameEngine {
 
     this.player.update(dt, this);
     this.director.update(dt);
+    this.updateZoneEvents(dt);
 
     // 更新所有实体
     this.enemies.forEach(e => e.update(dt, this.player, this));
@@ -976,24 +1225,10 @@ export class GameEngine {
       ctx.translate(-cx, -cy);
     }
 
-    // 绘制地图背景与网格
+    // 绘制办公室分区地图与随机事件
     const stageConf = this.director.stageConfig;
-    ctx.fillStyle = stageConf.bgFloor || "#1e293b";
-    ctx.fillRect(0, 0, this.mapWidth, this.mapHeight);
-
-    ctx.strokeStyle = stageConf.gridColor || "#334155";
-    ctx.lineWidth = 1;
-    const gridSize = 40;
-    for (let x = 0; x <= this.mapWidth; x += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0); ctx.lineTo(x, this.mapHeight);
-      ctx.stroke();
-    }
-    for (let y = 0; y <= this.mapHeight; y += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(0, y); ctx.lineTo(this.mapWidth, y);
-      ctx.stroke();
-    }
+    this.drawOfficeMap(ctx, stageConf);
+    this.drawZoneEvents(ctx);
 
     // 绘制各层实体
     this.aoeZones.forEach(z => z.draw(ctx));
@@ -1007,6 +1242,7 @@ export class GameEngine {
     this.floatingTexts.forEach(ft => ft.draw(ctx));
 
     ctx.restore();
+    this.drawBossHud();
   }
 
   loop(timestamp) {

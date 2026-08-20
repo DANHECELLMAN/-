@@ -1,9 +1,9 @@
 /**
- * 《今天也不想上班》- 实体与战斗系统核心类库 (V1.7 Bug修复与武器池扩展版)
+ * 《今天也不想上班》- 实体与战斗系统核心类库 (V1.8 地图事件与移动端横屏优化版)
  */
 
-import { M_TO_PX, CHARACTERS, PLAYER_BASE, PRESSURE_STAGES, WEAPONS, SKILLS, ARTIFACTS, NORMAL_ENEMIES, ELITES, UPGRADE_SYSTEM, STAGES_CONFIG } from './constants.js?v=1.7';
-import { sound } from './audio.js?v=1.7';
+import { M_TO_PX, CHARACTERS, PLAYER_BASE, PRESSURE_STAGES, WEAPONS, SKILLS, ARTIFACTS, NORMAL_ENEMIES, ELITES, UPGRADE_SYSTEM, STAGES_CONFIG } from './constants.js?v=1.8';
+import { sound } from './audio.js?v=1.8';
 
 // 伤害飘字类
 export class DamageNumber {
@@ -2249,6 +2249,7 @@ export class BaseBoss {
     game.projectiles = game.projectiles.filter(p => !p.isEnemy);
     game.aoeZones = game.aoeZones.filter(z => z.owner !== this);
     game.obstacles = game.obstacles.filter(o => o.owner !== this);
+    if (game.bossInstance === this) game.bossInstance = null;
     game.drops.push(new DropItem(this.x, this.y, 'punch_card'));
     sound.playVictory();
     game.addFloatingText(this.x, this.y - 45, `🎉 ${this.name} 被击溃！打卡下班！`, "#fbbf24", 24);
@@ -2274,19 +2275,6 @@ export class BaseBoss {
       ctx.fillText("🔥", this.x, this.y - 20);
     }
 
-    const mapW = ctx.canvas.width;
-    ctx.fillStyle = "rgba(0,0,0,0.75)";
-    ctx.fillRect(mapW / 2 - 160, 46, 320, 16);
-    ctx.fillStyle = this.color;
-    ctx.fillRect(mapW / 2 - 160, 46, Math.max(0, 320 * (this.hp / this.maxHp)), 16);
-    ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(mapW / 2 - 160, 46, 320, 16);
-
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 12px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText(`【${this.conf.title || 'Boss'}】${this.name} (${Math.round(this.hp)}/${this.maxHp}) - P${this.currentPhase}`, mapW / 2, 40);
     ctx.restore();
   }
 }
@@ -2336,7 +2324,7 @@ export class SupervisorBoss extends BaseBoss {
             const targetX = player.x;
             const targetY = player.y;
             game.aoeZones.push(new AOEZone({
-              x: targetX, y: targetY, radius: 1.4 * M_TO_PX, duration: 0.7, type: "boss_warning_circle", owner: this,
+              x: targetX, y: targetY, radius: 1.4 * M_TO_PX, duration: 0.7, type: "boss_pulse", owner: this,
               onComplete: () => {
                 sound.playExplosion(false);
                 if (this.alive && player.alive && Math.hypot(player.x - targetX, player.y - targetY) <= 1.4 * M_TO_PX + player.radius) {
@@ -2512,12 +2500,85 @@ export class HarassmentCallBoss extends BaseBoss {
   }
 }
 
-export function createBossInstance(type, x, y, customConf = null) {
-  if (type === "demanding_client" || (customConf && customConf.id === "demanding_client")) {
-    return new DemandingClientBoss(x, y, customConf);
-  } else if (type === "harassment_call" || (customConf && customConf.id === "harassment_call")) {
-    return new HarassmentCallBoss(x, y, customConf);
-  } else {
-    return new SupervisorBoss(x, y, customConf);
+export class ProjectDirectorBoss extends BaseBoss {
+  constructor(x, y, conf) { super(x, y, conf || STAGES_CONFIG.stage_2.boss); }
+  update(dt, player, game) {
+    if (!this.alive) return; this.updateStatus(dt, game);
+    const hpPct = this.hp / this.maxHp;
+    if (hpPct <= 0.35) this.currentPhase = 3; else if (hpPct <= 0.70) this.currentPhase = 2;
+    this.moveTowardPlayer(dt, player, this.speed * (this.currentPhase === 3 ? 1.2 : 1.0));
+    this.actionTimer += dt;
+    if (this.actionTimer >= (this.currentPhase === 3 ? 2.8 : 4.0)) {
+      this.actionTimer = 0;
+      if (Math.random() < 0.5) {
+        game.addFloatingText(this.x, this.y - 30, "📊 PPT全屏对齐！", "#818cf8", 16);
+        game.aoeZones.push(new AOEZone({ x: player.x, y: player.y, radius: 2.6 * M_TO_PX, duration: 0.9, damage: this.damage * 0.85, type: "boss_pulse", owner: this }));
+      } else {
+        game.addFloatingText(this.x, this.y - 30, "📑 连环方案飞页！", "#6366f1", 16);
+        for (let i = -2; i <= 2; i++) {
+          const base = Math.atan2(player.y - this.y, player.x - this.x) + i * 0.16;
+          game.projectiles.push(new Projectile({ x:this.x, y:this.y, vx:Math.cos(base)*235, vy:Math.sin(base)*235, damage:this.damage*0.65, radius:8, isEnemy:true, type:"client_stamp_bullet" }));
+        }
+      }
+    }
+    this.handleContactDamage(player, game);
   }
+}
+
+export class CeoBoss extends BaseBoss {
+  constructor(x, y, conf) { super(x, y, conf || STAGES_CONFIG.stage_5.boss); }
+  update(dt, player, game) {
+    if (!this.alive) return; this.updateStatus(dt, game);
+    const hpPct = this.hp / this.maxHp;
+    if (hpPct <= 0.35) this.currentPhase = 3; else if (hpPct <= 0.70) this.currentPhase = 2;
+    this.moveTowardPlayer(dt, player, this.speed * 0.92);
+    this.actionTimer += dt;
+    if (this.actionTimer >= (this.currentPhase === 3 ? 2.7 : 4.1)) {
+      this.actionTimer = 0;
+      if (Math.random() < 0.5) {
+        game.addFloatingText(this.x, this.y - 32, "🥞 年终大饼核爆！", "#fbbf24", 17);
+        game.aoeZones.push(new AOEZone({ x:player.x, y:player.y, radius:3.4*M_TO_PX, duration:1.0, damage:this.damage, type:"boss_warning_circle", owner:this }));
+      } else {
+        game.addFloatingText(this.x, this.y - 32, "💰 资本弹幕！", "#eab308", 17);
+        const count = this.currentPhase === 3 ? 14 : 10;
+        for (let i = 0; i < count; i++) {
+          const a = i * Math.PI * 2 / count;
+          game.projectiles.push(new Projectile({ x:this.x, y:this.y, vx:Math.cos(a)*210, vy:Math.sin(a)*210, damage:this.damage*0.62, radius:8, isEnemy:true, type:"call_bullet" }));
+        }
+      }
+    }
+    this.handleContactDamage(player, game);
+  }
+}
+
+export class TeambuildingCoachBoss extends BaseBoss {
+  constructor(x, y, conf) { super(x, y, conf || STAGES_CONFIG.stage_6.boss); }
+  update(dt, player, game) {
+    if (!this.alive) return; this.updateStatus(dt, game);
+    const hpPct = this.hp / this.maxHp;
+    if (hpPct <= 0.35) this.currentPhase = 3; else if (hpPct <= 0.70) this.currentPhase = 2;
+    this.moveTowardPlayer(dt, player, this.speed * (this.currentPhase === 3 ? 1.35 : 1.08));
+    this.actionTimer += dt;
+    if (this.actionTimer >= (this.currentPhase === 3 ? 2.6 : 3.8)) {
+      this.actionTimer = 0;
+      if (Math.random() < 0.55) {
+        game.addFloatingText(this.x, this.y - 30, "📣 狼性口号震荡！", "#22c55e", 16);
+        game.aoeZones.push(new AOEZone({ x:this.x, y:this.y, radius:4.2*M_TO_PX, duration:0.65, damage:this.damage*0.8, type:"boss_pulse", owner:this }));
+      } else {
+        game.addFloatingText(this.x, this.y - 30, "🏃 强制拉练增援！", "#16a34a", 16);
+        for (let i = 0; i < 4; i++) game.enemies.push(new Enemy("zombie_colleague", this.x + (Math.random()-0.5)*90, this.y + (Math.random()-0.5)*90, 1.6, 1.25));
+      }
+    }
+    this.handleContactDamage(player, game);
+  }
+}
+
+export function createBossInstance(type, x, y, customConf = null) {
+  const bossType = customConf?.id || type;
+  if (bossType === "demanding_client") return new DemandingClientBoss(x, y, customConf);
+  if (bossType === "harassment_call") return new HarassmentCallBoss(x, y, customConf);
+  if (bossType === "project_director") return new ProjectDirectorBoss(x, y, customConf);
+  if (bossType === "ceo_bigboss") return new CeoBoss(x, y, customConf);
+  if (bossType === "teambuilding_coach") return new TeambuildingCoachBoss(x, y, customConf);
+  return new SupervisorBoss(x, y, customConf);
 }
