@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>今天也不想上班 - 动作肉鸽战斗系统 V1.5</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="game-container">
+    <!-- 游戏画布 -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- 顶部一体化防重叠 HUD 状态栏 -->
+    <div id="hud">
+      <div class="hud-top-bar">
+        <!-- 左侧：头像与生命 + PC技能CD指示 -->
+        <div class="hud-section-left">
+          <span id="hud-avatar" class="hud-avatar">👨‍💼</span>
+          <div class="hp-wrapper">
+            <div class="bar-bg">
+              <div id="hud-hp-fill" class="hp-fill"></div>
+            </div>
+            <span id="hud-hp-text" class="hp-text">110 / 110</span>
+          </div>
+          <div id="hud-pc-cd" class="hud-pc-cd">
+            <span id="hud-skill-status" class="hud-cd-badge ready">🔥 E: 就绪</span>
+            <span id="hud-dodge-status" class="hud-cd-badge ready">💨 闪避: 就绪</span>
+          </div>
+        </div>
+
+        <!-- 中间：下班倒计时 -->
+        <div id="hud-time" class="hud-section-center">00:00 / 08:00</div>
+
+        <!-- 右侧：等级与经验 + 设置齿轮 -->
+        <div class="hud-section-right">
+          <div class="xp-wrapper">
+            <span id="hud-level" style="font-size:11px; font-weight:bold; color:#38bdf8;">Lv.1</span>
+            <div class="bar-bg" style="width: 60px;">
+              <div id="hud-xp-fill" class="xp-fill"></div>
+            </div>
+          </div>
+          <button id="btn-open-settings" class="btn-menu-icon">⚙️</button>
+        </div>
+      </div>
+
+      <!-- 底部固定压力条 (安全居中，不挡按键) -->
+      <div class="hud-bottom-center">
+        <div class="pressure-bar-bg">
+          <div id="hud-pressure-fill" class="pressure-fill"></div>
+        </div>
+        <div id="hud-pressure-text" class="pressure-text">压力: 0/100 【正常】</div>
+      </div>
+    </div>
+
+    <!-- 手机端虚拟触控 -->
+    <div id="mobile-controls">
+      <div id="joystick-zone">
+        <div id="joystick-base">
+          <span class="joystick-arrow arrow-up">▲</span>
+          <span class="joystick-arrow arrow-down">▼</span>
+          <span class="joystick-arrow arrow-left">◀</span>
+          <span class="joystick-arrow arrow-right">▶</span>
+          <div id="joystick-nub"><span>🕹️</span></div>
+        </div>
+      </div>
+
+      <div class="action-buttons">
+        <button id="btn-skill" class="action-btn">
+          <span style="font-size: 20px;">🔥</span>
+          <span style="font-size: 11px;">职业大招</span>
+        </button>
+        <button id="btn-dodge" class="action-btn btn-dodge-style">
+          <span style="font-size: 20px;">💨</span>
+          <span style="font-size: 11px;">摸鱼闪避</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 主菜单 -->
+    <div id="main-menu">
+      <div class="game-logo">今天也不想上班</div>
+      <div class="game-sub">全自动智能索敌 · 8大武器库 & 冰火核爆 · 员工晋升 · 无尽模式 (V1.5)</div>
+      <div class="menu-buttons">
+        <button id="btn-start-game" class="btn" style="padding: 12px 24px; font-size: 15px;">🚀 开始下班 (进入游戏)</button>
+        <button id="btn-open-characters" class="btn btn-secondary">🎭 职业角色 (小陈/阿伟/莉莉/小张)</button>
+        <button id="btn-open-stages" class="btn btn-secondary">🏢 关卡选择 (周一至周末 + 无尽加班)</button>
+        <button id="btn-open-talents" class="btn btn-secondary">📋 员工晋升 (提升角色与武器属性)</button>
+        <button id="btn-open-guide" class="btn btn-secondary">📖 职场生存指南 (操作、武器与Boss)</button>
+      </div>
+    </div>
+
+    <!-- 角色选择弹窗 -->
+    <div id="character-modal" class="modal-overlay">
+      <div class="modal-content">
+        <button id="btn-close-char-x" class="modal-close-x">✕</button>
+        <div class="modal-title">🎭 选择出战角色</div>
+        <div class="modal-subtitle">每个角色拥有独特的初始武器、被动天赋与专属大招</div>
+        <div id="character-cards-container" class="char-grid"></div>
+        <div style="display: flex; gap: 10px; justify-content: center; margin-top: 10px;">
+          <button id="btn-close-characters" class="btn">确定选择</button>
+          <button id="btn-back-characters" class="btn btn-secondary">返回主页</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 关卡选择弹窗 -->
+    <div id="stage-modal" class="modal-overlay">
+      <div class="modal-content">
+        <button id="btn-close-stage-x" class="modal-close-x">✕</button>
+        <div class="modal-title">🏢 选择挑战关卡</div>
+        <div class="modal-subtitle">通关逐级解锁 · 周一至周末 + 无尽模式（各具专属Boss与地形机制）</div>
+        <div id="stage-cards-container" class="stage-grid"></div>
+        <div style="display: flex; gap: 10px; justify-content: center; margin-top: 10px;">
+          <button id="btn-close-stages" class="btn">确定关卡</button>
+          <button id="btn-back-stages" class="btn btn-secondary">返回主页</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 快捷设置与调试弹窗 -->
+    <div id="settings-menu-modal" class="modal-overlay">
+      <div class="modal-content">
+        <button id="btn-close-settings-x" class="modal-close-x">✕</button>
+        <div class="modal-title">⚙️ 游戏设置与调试</div>
+        <div class="settings-menu-list">
+          <button id="btn-toggle-sound" class="btn btn-secondary">🔊 音效: 开</button>
+          <button id="btn-toggle-speed" class="btn btn-secondary">⏱️ 游戏速度: 1x</button>
+          <button id="btn-toggle-controls" class="btn btn-secondary">🎮 虚拟摇杆: 开</button>
+          <button id="btn-test-boss" class="btn btn-secondary" style="color: #ef4444;">👹 召唤当前关卡Boss (测试)</button>
+          <button id="btn-pause-from-settings" class="btn">摸鱼暂停游戏</button>
+        </div>
+        <button id="btn-close-settings" class="btn btn-secondary">关闭</button>
+      </div>
+    </div>
+
+    <!-- 升级三选一弹窗 -->
+    <div id="levelup-modal" class="modal-overlay">
+      <div class="modal-content">
+        <div class="modal-title">🎉 工作能力提升！</div>
+        <div class="modal-subtitle">选择一项工作技能、新武器或进化超级武器</div>
+        <div id="levelup-cards" class="card-container"></div>
+        <button id="levelup-reroll-btn" class="btn btn-secondary">刷新选项 (1次免费)</button>
+      </div>
+    </div>
+
+    <!-- 神器选择弹窗 -->
+    <div id="artifact-modal" class="modal-overlay">
+      <div class="modal-content">
+        <div class="modal-title" style="color: #a855f7;">🎁 获得职场神器！</div>
+        <div class="modal-subtitle">从精英怪掉落中挑选1件神装</div>
+        <div id="artifact-cards" class="card-container"></div>
+      </div>
+    </div>
+
+    <!-- 暂停弹窗 -->
+    <div id="pause-modal" class="modal-overlay">
+      <div class="modal-content">
+        <div class="modal-title">⏸️ 摸鱼休息中</div>
+        <div id="pause-stats-content" style="text-align: left; margin-bottom: 16px; line-height: 1.8;"></div>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+          <button id="btn-resume-game" class="btn">继续战斗</button>
+          <button id="btn-quit-game" class="btn btn-secondary">退出回主页</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 游戏失败弹窗 -->
+    <div id="gameover-modal" class="modal-overlay">
+      <div class="modal-content">
+        <div class="modal-title" style="color: #ef4444;">📁 今日工作未完成...</div>
+        <div class="modal-subtitle">被文件堆埋住了，未能成功下班</div>
+        <div class="result-stats">
+          <div class="result-item">存活时间：<b id="gameover-time">00:00</b></div>
+          <div class="result-item">击杀工作：<b id="gameover-kills">0</b></div>
+          <div class="result-item">最高压力：<b id="gameover-pressure">0%</b></div>
+          <div class="result-item">完美闪避：<b id="gameover-dodges">0</b></div>
+          <div class="result-item" style="grid-column: span 2;">获得工资：<b id="gameover-gold" style="color: #10b981;">+0</b></div>
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+          <button id="btn-restart-gameover" class="btn">再开一局</button>
+          <button id="btn-menu-gameover" class="btn btn-secondary">返回主菜单</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 游戏胜利弹窗 -->
+    <div id="victory-modal" class="modal-overlay">
+      <div class="modal-content">
+        <div class="modal-title" style="color: #10b981;">🎉 18:00 准点下班！</div>
+        <div class="modal-subtitle">成功击败Boss，打卡下班！“明天也要准时上班。”</div>
+        <div class="result-stats">
+          <div class="result-item">存活时间：<b id="victory-time">08:00</b></div>
+          <div class="result-item">击杀工作：<b id="victory-kills">0</b></div>
+          <div class="result-item">最高压力：<b id="victory-pressure">0%</b></div>
+          <div class="result-item">完美闪避：<b id="victory-dodges">0</b></div>
+          <div class="result-item" style="grid-column: span 2;">获得工资：<b id="victory-gold" style="color: #10b981;">+0</b></div>
+          <div class="build-showcase">本局Build：<span id="victory-build">-</span></div>
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+          <button id="btn-restart-victory" class="btn">再开一局</button>
+          <button id="btn-menu-victory" class="btn btn-secondary">返回主菜单</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 员工晋升与属性研习弹窗 -->
+    <div id="talent-modal" class="modal-overlay">
+      <div class="modal-content">
+        <button id="btn-close-talent-x" class="modal-close-x">✕</button>
+        <div class="modal-title">📋 员工晋升与属性研习</div>
+        <div id="talent-gold" class="modal-subtitle" style="color: #fbbf24; font-weight: bold;">当前存款工资：¥ 0</div>
+        <div id="talent-list" class="talent-list"></div>
+        <button id="btn-close-talents" class="btn" style="margin-top: 10px;">返回主页</button>
+      </div>
+    </div>
+
+    <!-- 玩法指南弹窗 -->
+    <div id="guide-modal" class="modal-overlay">
+      <div class="modal-content" style="text-align: left;">
+        <button id="btn-close-guide-x" class="modal-close-x">✕</button>
+        <div class="modal-title" style="text-align: center;">📖 职场生存与全武器指南 (V1.5)</div>
+        <div style="font-size: 11px; line-height: 1.6; color: #cbd5e1; margin-bottom: 14px; max-height: 60vh; overflow-y: auto;">
+          <p><b>【全自动索敌机制】</b></p>
+          <p>• 所有武器均已升级为<b>全场景智能自动索敌</b>，优先攻击敌人聚集密度最高、威胁最大的区域，无需手动对准方向，专注移动与走位！</p>
+          <br>
+          <p><b>【八大核心武器与超级进化】</b></p>
+          <p>• <b>人体工学椅 (新)：</b> 诺手Q式360°旋转大杀四方！每5秒狂暴横扫一圈，外圈造成巨额暴击伤害、强力击退并恢复摸鱼值与生命！进化：<b>老板真皮按摩椅</b>（全方位气动旋风斩+气动护盾）。</p>
+          <p>• <b>空调·制冷 (新)：</b> 喷射极寒冷气，伤害较低但可将命中的敌人<b>冻结 1.0 秒</b>（完全定身停止移动与攻击）并附加减速！</p>
+          <p>• <b>空调·制热 (新)：</b> 喷射滚烫热风波，高额初始伤害并对敌人附加<b>持续灼烧热伤害（DoT）</b>！</p>
+          <p>• <b>💥 中央空调·冰火两重天 (共鸣超武)：</b> 同时拥有制冷与制热模式时激活！周期性在最密集敌群引爆大范围<b>冷热对流核爆（范围爆炸攻击）</b>，对冻结敌人造成双倍碎冰毁灭暴击并点燃全场！</p>
+          <p>• <b>机械键盘：</b> 远程高射速键帽，自动追踪敌群。进化：<b>祖安机械键盘</b>（连锁“？？？”爆炸）。</p>
+          <p>• <b>马克杯：</b> 大范围环绕扫荡与咖啡水花溅射。进化：<b>无限续杯</b>（周期释放4米咖啡冲击波）。</p>
+          <p>• <b>辞职信：</b> 自动锁定密集敌群抛射公文袋轰炸，留下腐蚀水洼。进化：<b>辞职报告</b>（全屏密集处巨力砸落）。</p>
+          <p>• <b>降噪耳机：</b> 360° 全方位高频声波震荡穿透全怪。进化：<b>降噪核爆耳机</b>（震碎敌方弹道）。</p>
+          <p>• <b>养生水杯：</b> 自动向敌群投掷水杯落地碎裂，形成大水洼。进化：<b>高压八杯水领域</b>（全场暴雨回血）。</p>
+          <p>• <b>快充充电线：</b> 自动向敌群扇形横扫高压电弧 + 链式闪电弹跳。进化：<b>超导快充高压鞭</b>（全屏超导雷击+电网）。</p>
+          <br>
+          <p><b>【全周关卡、无尽模式与强力Boss】</b></p>
+          <p>• <b>关卡解锁体系：</b> 通关前置关卡即可解锁下一关，挑战逐步升级！</p>
+          <p>• <b>周一 (部门主管)：</b> 文件雨轰炸与紧急需求连发。</p>
+          <p>• <b>周二 (项目总监)：</b> PPT激光网与连环对齐会。</p>
+          <p>• <b>周三 (刁难的客户 - 新Boss)：</b> 划定“需求红线”封锁禁行区、砸下“巨型合同柱”可破坏障碍物限制移动、释放“方案打回”引力黑洞！</p>
+          <p>• <b>周四 (骚扰电话 - 新Boss)：</b> 植入“响铃分机”减速声波塔、震裂地面形成电波断层、“夺命连环call”追踪弹幕与全屏EMP脉冲！</p>
+          <p>• <b>周五 (大老板·CEO) & 周末 (团建魔鬼教练)</b></p>
+          <p>• <b>🔥 无尽模式 · 通宵加班：</b> 没有下班时间上限！怪物随时间无限狂暴成长，每90秒随机刷新强力Boss轮番突袭，挑战你的最高生存极限！</p>
+          <br>
+          <p><b>【员工晋升与属性研习系统】</b></p>
+          <p>• 消耗打工赚取的工资存款，分别强化<b>【角色个人属性】</b>（生命、移速、回血、抗压、拾取、暴击、悟性、薪资）与<b>【武器全局属性】</b>（武器伤害、攻速CD、范围AoE、弹速、击退、超武共鸣），并支持随时一键全额重置退款！</p>
+        </div>
+        <div style="text-align: center;">
+          <button id="btn-close-guide" class="btn">我明白了</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
