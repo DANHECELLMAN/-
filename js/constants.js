@@ -1,5 +1,5 @@
 /**
- * 《今天也不想上班》- 核心数值常量与配置表 (V1.5 终极优化版)
+ * 《今天也不想上班》- 核心数值常量与配置表 (V1.7 Bug修复与武器池扩展版)
  */
 
 export const M_TO_PX = 32;
@@ -152,9 +152,9 @@ export const CHARACTERS = {
     active: {
       name: "角虎机动",
       icon: "🦄",
-      desc: "启动 0.9 秒高机动冲刺并释放近身冲击波，对周围敌人造成伤害与击退。",
-      cd: 15.0,
-      duration: 0.9
+      desc: "启动持续 3 秒的机动能量场，能量场始终跟随角色移动并持续伤害附近敌人。",
+      cd: 5.0,
+      duration: 3.0
     }
   }
 };
@@ -189,6 +189,8 @@ export const WEAPONS = {
     icon: "⌨️",
     desc: "高射速远程键帽，智能自动瞄准敌群，成长后多弹道与穿透。",
     tag: "射速 / 穿透 / 自动索敌",
+    rarity: "common",
+    dropWeight: 58,
     levels: [
       { level: 1, desc: "基础伤害 14，攻击间隔 0.52s，自动射击单发键帽", damage: 14, interval: 0.52, range: 8.0 * M_TO_PX, count: 1, pierce: 0 },
       { level: 2, desc: "伤害 +20%", damageMult: 1.20 },
@@ -211,6 +213,8 @@ export const WEAPONS = {
     icon: "☕",
     desc: "白瓷杯环绕自身形成全方位绞杀圈，大范围近身扫荡与咖啡溅射。",
     tag: "范围 / 环绕扫荡",
+    rarity: "common",
+    dropWeight: 55,
     levels: [
       { level: 1, desc: "1个大马克杯环绕扫荡，每次造成 18 范围伤害与溅射", damage: 18, count: 1, speed: 2.4, radius: 2.2 * M_TO_PX, hitCd: 0.35 },
       { level: 2, desc: "旋转速度 +25%，扫荡判定范围扩大", speedMult: 1.25 },
@@ -233,6 +237,8 @@ export const WEAPONS = {
     icon: "📄",
     desc: "自动锁定敌人最密集区域抛射公文袋，轰炸爆炸后留下腐蚀水洼。",
     tag: "范围 / 密集轰炸",
+    rarity: "rare",
+    dropWeight: 30,
     levels: [
       { level: 1, desc: "每 2.0s 自动轰炸最密集敌群，爆炸半径 1.8m，伤害 45", damage: 45, interval: 2.0, radius: 1.8 * M_TO_PX },
       { level: 2, desc: "爆炸半径 +20%", radiusMult: 1.20 },
@@ -255,6 +261,8 @@ export const WEAPONS = {
     icon: "🎧",
     desc: "释放 360° 全方位高频声波震荡，穿透击退附近全屏敌群。",
     tag: "范围 / 360°声波穿透",
+    rarity: "rare",
+    dropWeight: 28,
     levels: [
       { level: 1, desc: "每 2.0s 释放 2.2m 环形声波，造成 24 伤害并穿透击退全怪", damage: 24, interval: 2.0, radius: 2.2 * M_TO_PX },
       { level: 2, desc: "声波半径 +20%，伤害 +18%", radiusMult: 1.20, damageMult: 1.18 },
@@ -277,6 +285,8 @@ export const WEAPONS = {
     icon: "🫗",
     desc: "自动锁定敌群投掷水杯碎裂在地，形成大范围烫水水洼造成持续伤害。",
     tag: "地面 / 持续伤害 / 自动投掷",
+    rarity: "common",
+    dropWeight: 50,
     levels: [
       { level: 1, desc: "每 2.2s 自动向敌群投掷水杯，落地生成 1.8m 水洼持续 2.0 秒（造成持续伤害）", damage: 15, interval: 2.2, radius: 1.8 * M_TO_PX, count: 1, duration: 2.0 },
       { level: 2, desc: "水洼半径 +20%，投掷间隔 -15%", radiusMult: 1.20, intervalMult: 0.85 },
@@ -299,6 +309,8 @@ export const WEAPONS = {
     icon: "🔌",
     desc: "自动锁定向敌人最密集方向挥舞高压电弧，大范围电击横扫与链式电击。",
     tag: "近战 / 自动扇形电弧 / 连锁",
+    rarity: "rare",
+    dropWeight: 26,
     levels: [
       { level: 1, desc: "每 1.0s 自动向敌群扇形 (半径 2.4m) 挥舞电鞭，造成 34 电击与链式电弧", damage: 34, interval: 1.0, range: 2.4 * M_TO_PX, count: 1 },
       { level: 2, desc: "攻击范围 +20%，电击伤害 +20%", rangeMult: 1.20, damageMult: 1.20 },
@@ -321,6 +333,8 @@ export const WEAPONS = {
     icon: "🪑",
     desc: "诺手Q式360°大杀四方！每5秒狂暴旋转横扫一圈，外圈造成巨额暴击、强力击退并恢复摸鱼值。",
     tag: "近战 / 360°横扫 / 外圈暴击",
+    rarity: "epic",
+    dropWeight: 13,
     levels: [
       { level: 1, desc: "每 5.0s 旋转工学椅横扫一圈 (半径 2.8m)，内圈造成 45 伤害，外圈造成 170% 暴击与强力击退", damage: 45, interval: 5.0, range: 2.8 * M_TO_PX },
       { level: 2, desc: "横扫伤害 +25%，旋转半径 +15%", damageMult: 1.25, rangeMult: 1.15 },
@@ -343,6 +357,8 @@ export const WEAPONS = {
     icon: "❄️",
     desc: "自动锁定敌群喷射极寒冷气，伤害较低但能将命中的敌人冻结 1.0 秒（完全定身停止行动）！",
     tag: "控场 / 极寒冻结1s",
+    rarity: "rare",
+    dropWeight: 24,
     levels: [
       { level: 1, desc: "每 2.5s 向密集敌群喷射极寒冷气 (半径 5.5m)，造成 20 伤害并冻结敌人 1.0 秒", damage: 20, interval: 2.5, range: 5.5 * M_TO_PX, freezeDuration: 1.0 },
       { level: 2, desc: "冷气范围 +20%，喷射间隔 -15%", rangeMult: 1.20, intervalMult: 0.85 },
@@ -358,12 +374,99 @@ export const WEAPONS = {
     icon: "🔥",
     desc: "自动锁定敌群喷射滚烫热浪，伤害较高并对命中的敌人附加持续灼烧热伤害（DoT）！",
     tag: "输出 / 持续灼烧",
+    rarity: "epic",
+    dropWeight: 11,
     levels: [
       { level: 1, desc: "每 2.5s 向密集敌群喷射热浪 (半径 5.5m)，造成 50 伤害并灼烧敌人 3 秒 (每0.5s造成15伤害)", damage: 50, interval: 2.5, range: 5.5 * M_TO_PX, burnDps: 30, burnDuration: 3.0 },
       { level: 2, desc: "初始伤害 +25%，灼烧伤害 +25%", damageMult: 1.25, burnDmgMult: 1.25 },
       { level: 3, desc: "喷射间隔 -15%，灼烧持续时间延长至 4.0 秒", intervalMult: 0.85, burnDuration: 4.0 },
       { level: 4, desc: "热浪范围 +25%，喷射后在地面留下一道持续 2 秒的余热火海", rangeMult: 1.25, groundFire: true },
       { level: 5, desc: "初始伤害 +30%，被灼烧敌人死亡时引发烈焰爆炸", damageMult: 1.30, deathExplode: true }
+    ]
+  },
+  wireless_mouse: {
+    id: "wireless_mouse",
+    name: "无线鼠标",
+    type: "projectile",
+    icon: "🖱️",
+    desc: "高频自动锁定最近敌人发射鼠标冲击，射速快、稳定、适合前期清杂。",
+    tag: "射速 / 自动索敌",
+    rarity: "common",
+    dropWeight: 56,
+    levels: [
+      { level: 1, desc: "每 0.68s 发射 1 枚鼠标冲击，造成 18 伤害", damage: 18, interval: 0.68, count: 1 },
+      { level: 2, desc: "伤害 +25%", damageMult: 1.25 },
+      { level: 3, desc: "攻击间隔 -18%", intervalMult: 0.82 },
+      { level: 4, desc: "额外发射 1 枚鼠标冲击", extraCount: 1 },
+      { level: 5, desc: "伤害 +30%，子弹穿透 +1", damageMult: 1.30, pierce: 1 }
+    ]
+  },
+  stapler: {
+    id: "stapler",
+    name: "重型订书机",
+    type: "burst_projectile",
+    icon: "📎",
+    desc: "向敌人密集方向连续打出订书钉散射，近中距离爆发优秀。",
+    tag: "爆发 / 散射 / 穿透",
+    rarity: "rare",
+    dropWeight: 29,
+    levels: [
+      { level: 1, desc: "每 1.35s 发射 3 枚订书钉散射，每枚 16 伤害", damage: 16, interval: 1.35, count: 3 },
+      { level: 2, desc: "每枚伤害 +22%", damageMult: 1.22 },
+      { level: 3, desc: "散射数量 +2", extraCount: 2 },
+      { level: 4, desc: "攻击间隔 -18%，订书钉飞行速度提升", intervalMult: 0.82 },
+      { level: 5, desc: "每枚伤害 +30%，全部获得 1 次穿透", damageMult: 1.30, pierce: 1 }
+    ]
+  },
+  printer_storm: {
+    id: "printer_storm",
+    name: "打印机风暴",
+    type: "radial_projectile",
+    icon: "🖨️",
+    desc: "周期性向四周喷射大量纸张，形成环形弹幕清理近身怪群。",
+    tag: "环形弹幕 / 群体清杂",
+    rarity: "rare",
+    dropWeight: 24,
+    levels: [
+      { level: 1, desc: "每 2.6s 向 8 个方向喷射纸张，每张造成 20 伤害", damage: 20, interval: 2.6, count: 8 },
+      { level: 2, desc: "伤害 +20%，弹道数量提升至 10", damageMult: 1.20, count: 10 },
+      { level: 3, desc: "冷却 -18%", intervalMult: 0.82 },
+      { level: 4, desc: "弹道数量提升至 12，并获得轻微击退", count: 12, knockback: true },
+      { level: 5, desc: "伤害 +35%，纸张穿透 +1", damageMult: 1.35, pierce: 1 }
+    ]
+  },
+  projector: {
+    id: "projector",
+    name: "会议投影仪",
+    type: "projector_beam",
+    icon: "📽️",
+    desc: "自动锁定敌群投射宽幅高亮光束，对扇形范围内敌人造成高额伤害。",
+    tag: "大范围 / 扇形爆发",
+    rarity: "epic",
+    dropWeight: 12,
+    levels: [
+      { level: 1, desc: "每 3.4s 投射 110° 宽幅光束，半径 5.2m，造成 62 伤害", damage: 62, interval: 3.4, range: 5.2 * M_TO_PX, coneAngle: 110 },
+      { level: 2, desc: "光束伤害 +25%", damageMult: 1.25 },
+      { level: 3, desc: "范围 +18%，角度扩大至 135°", rangeMult: 1.18, coneAngle: 135 },
+      { level: 4, desc: "冷却 -20%", intervalMult: 0.80 },
+      { level: 5, desc: "伤害 +35%，命中附带强力击退", damageMult: 1.35, knockback: true }
+    ]
+  },
+  server_crash: {
+    id: "server_crash",
+    name: "服务器宕机",
+    type: "server_crash",
+    icon: "🖥️💥",
+    desc: "金色传说武器。周期性锁定敌人最密集区域，引爆超大范围系统崩溃冲击。",
+    tag: "金色传说 / 超大范围 / 高爆发",
+    rarity: "legendary",
+    dropWeight: 4,
+    levels: [
+      { level: 1, desc: "每 8.5s 在敌群中心引爆半径 4.8m 的服务器宕机，造成 150 伤害", damage: 150, interval: 8.5, range: 4.8 * M_TO_PX },
+      { level: 2, desc: "伤害 +28%", damageMult: 1.28 },
+      { level: 3, desc: "爆炸半径 +22%", rangeMult: 1.22 },
+      { level: 4, desc: "冷却降低至 6.8s", intervalVal: 6.8 },
+      { level: 5, desc: "伤害 +40%，爆炸后额外触发一次 55% 余震", damageMult: 1.40, aftershock: true }
     ]
   },
   ac_fusion_evo: {
@@ -373,6 +476,8 @@ export const WEAPONS = {
     icon: "💥❄️🔥",
     desc: "冷热共鸣终极进化！周期性在敌人最密集区域引发大范围冰火冷热对流核爆（范围爆炸攻击），造成 240% 爆发伤害并碎冰火海！",
     tag: "超武共鸣 / 冰火核爆 / 范围毁灭",
+    rarity: "legendary",
+    dropWeight: 3,
     evolution: {
       id: "ac_fusion_evo",
       name: "中央空调·冰火两重天",
@@ -608,7 +713,7 @@ export const NORMAL_ENEMIES = {
     name: "同事僵尸",
     icon: "🧟",
     hp: 26,
-    damage: 6,
+    damage: 9,
     speed: 1.7 * M_TO_PX,
     threatCost: 1.0,
     xpDrop: 1,
@@ -620,7 +725,7 @@ export const NORMAL_ENEMIES = {
     name: "文件怪",
     icon: "📁",
     hp: 36,
-    damage: 8,
+    damage: 11,
     speed: 1.35 * M_TO_PX,
     threatCost: 1.4,
     xpDrop: 2,
@@ -631,7 +736,7 @@ export const NORMAL_ENEMIES = {
       id: "paper_scrap",
       name: "散落纸片",
       hp: 8,
-      damage: 3,
+      damage: 5,
       speed: 1.6 * M_TO_PX,
       size: 9,
       color: "#fef3c7"
@@ -642,7 +747,7 @@ export const NORMAL_ENEMIES = {
     name: "邮件怪",
     icon: "✉️",
     hp: 24,
-    damage: 7,
+    damage: 9,
     speed: 1.1 * M_TO_PX,
     threatCost: 1.8,
     xpDrop: 2,
@@ -652,7 +757,7 @@ export const NORMAL_ENEMIES = {
     keepDistance: 5.5 * M_TO_PX,
     attackInterval: 2.2,
     bulletSpeed: 4.5 * M_TO_PX,
-    bulletDamage: 7,
+    bulletDamage: 10,
     telegraphTime: 0.35
   },
   printer: {
@@ -660,7 +765,7 @@ export const NORMAL_ENEMIES = {
     name: "卡纸打印机",
     icon: "🖨️",
     hp: 75,
-    damage: 10,
+    damage: 13,
     speed: 0.7 * M_TO_PX,
     threatCost: 2.5,
     xpDrop: 4,
@@ -671,14 +776,14 @@ export const NORMAL_ENEMIES = {
     burstInterval: 0.15,
     attackInterval: 3.5,
     bulletSpeed: 5.0 * M_TO_PX,
-    bulletDamage: 8
+    bulletDamage: 11
   },
   meeting_monster: {
     id: "meeting_monster",
     name: "会议怪",
     icon: "👥",
     hp: 55,
-    damage: 8,
+    damage: 11,
     speed: 1.25 * M_TO_PX,
     threatCost: 2.0,
     xpDrop: 3,
@@ -694,7 +799,7 @@ export const NORMAL_ENEMIES = {
     name: "电话怪",
     icon: "📞",
     hp: 28,
-    damage: 6,
+    damage: 9,
     speed: 1.5 * M_TO_PX,
     threatCost: 1.6,
     xpDrop: 2,
@@ -703,7 +808,7 @@ export const NORMAL_ENEMIES = {
     sonicPulse: {
       interval: 4.0,
       radius: 3.2 * M_TO_PX,
-      damage: 7
+      damage: 10
     }
   },
   demand_ball: {
@@ -711,7 +816,7 @@ export const NORMAL_ENEMIES = {
     name: "急需求球",
     icon: "💣",
     hp: 20,
-    damage: 12,
+    damage: 14,
     speed: 2.5 * M_TO_PX,
     threatCost: 1.5,
     xpDrop: 2,
@@ -723,7 +828,7 @@ export const NORMAL_ENEMIES = {
     name: "散落纸片",
     icon: "📄",
     hp: 8,
-    damage: 3,
+    damage: 5,
     speed: 1.6 * M_TO_PX,
     threatCost: 0.5,
     xpDrop: 1,
@@ -735,7 +840,7 @@ export const NORMAL_ENEMIES = {
     name: "未读红点",
     icon: "🔴",
     hp: 12,
-    damage: 4,
+    damage: 6,
     speed: 3.0 * M_TO_PX,
     threatCost: 0.7,
     groupCount: 4,

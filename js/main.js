@@ -1,9 +1,9 @@
 /**
- * 《今天也不想上班》- 程序启动与全平台UI事件绑定 (V1.4 升级版)
+ * 《今天也不想上班》- 程序启动与全平台UI事件绑定 (V1.7 Bug修复与武器池扩展版)
  */
 
-import { GameEngine } from './game.js';
-import { sound } from './audio.js';
+import { GameEngine } from './game.js?v=1.7';
+import { sound } from './audio.js?v=1.7';
 
 window.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('game-canvas');

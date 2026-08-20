@@ -1,10 +1,10 @@
 /**
- * 《今天也不想上班》- 刷怪导演与模块化关卡系统 (V1.5 终极优化版)
+ * 《今天也不想上班》- 刷怪导演与模块化关卡系统 (V1.7 Bug修复与武器池扩展版)
  */
 
-import { STAGES_CONFIG, NORMAL_ENEMIES, ELITES, RANDOM_BOSS_ROSTER } from './constants.js';
-import { Enemy, Elite, createBossInstance } from './entities.js';
-import { sound } from './audio.js';
+import { STAGES_CONFIG, NORMAL_ENEMIES, ELITES, RANDOM_BOSS_ROSTER } from './constants.js?v=1.7';
+import { Enemy, Elite, createBossInstance } from './entities.js?v=1.7';
+import { sound } from './audio.js?v=1.7';
 
 export class WaveDirector {
   constructor(game) {

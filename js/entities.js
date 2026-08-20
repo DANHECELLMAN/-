@@ -1,9 +1,9 @@
 /**
- * 《今天也不想上班》- 实体与战斗系统核心类库 (V1.5 终极优化版)
+ * 《今天也不想上班》- 实体与战斗系统核心类库 (V1.7 Bug修复与武器池扩展版)
  */
 
-import { M_TO_PX, CHARACTERS, PLAYER_BASE, PRESSURE_STAGES, WEAPONS, SKILLS, ARTIFACTS, NORMAL_ENEMIES, ELITES, UPGRADE_SYSTEM, STAGES_CONFIG } from './constants.js';
-import { sound } from './audio.js';
+import { M_TO_PX, CHARACTERS, PLAYER_BASE, PRESSURE_STAGES, WEAPONS, SKILLS, ARTIFACTS, NORMAL_ENEMIES, ELITES, UPGRADE_SYSTEM, STAGES_CONFIG } from './constants.js?v=1.7';
+import { sound } from './audio.js?v=1.7';
 
 // 伤害飘字类
 export class DamageNumber {
@@ -291,6 +291,28 @@ export class Projectile {
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(this.isEvo ? "!" : "K", 0, 0);
+    } else if (this.type === "mouse_bullet") {
+      ctx.translate(this.x, this.y);
+      ctx.rotate(Math.atan2(this.vy, this.vx));
+      ctx.font = "15px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("🖱️", 0, 0);
+    } else if (this.type === "staple_bullet") {
+      ctx.translate(this.x, this.y);
+      ctx.rotate(Math.atan2(this.vy, this.vx));
+      ctx.strokeStyle = "#e2e8f0";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-7, -3); ctx.lineTo(7, -3); ctx.lineTo(7, 3);
+      ctx.stroke();
+    } else if (this.type === "paper_bullet") {
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.rotation);
+      ctx.font = "15px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("📄", 0, 0);
     } else if (this.type === "resignation_bomb") {
       ctx.translate(this.x, this.y);
       ctx.rotate(this.rotation);
@@ -380,6 +402,7 @@ export class TerrainObstacle {
     this.alive = true;
     this.pulseTimer = 0;
     this.isSolid = true;
+    this.owner = options.owner || null;
   }
 
   update(dt, player, game) {
@@ -408,7 +431,7 @@ export class TerrainObstacle {
         this.pulseTimer = 0;
         sound.playSonicWave(false);
         game.aoeZones.push(new AOEZone({
-          x: this.x, y: this.y, radius: 3.5 * M_TO_PX, duration: 1.5, type: "phone_pulse", slowPct: 0.40
+          x: this.x, y: this.y, radius: 3.5 * M_TO_PX, duration: 1.5, type: "phone_pulse", slowPct: 0.40, owner: this.owner
         }));
       }
     }
@@ -497,9 +520,17 @@ export class AOEZone {
     this.burnDps = options.burnDps || 25;
     this.sweetSpotMult = options.sweetSpotMult || 1.7;
     this.healAmount = options.healAmount || 0;
+    this.owner = options.owner || null;
+    this.followPlayer = options.followPlayer || false;
+    this.knockbackForce = options.knockbackForce || 0;
+    this.playerHit = false;
   }
 
   update(dt, game) {
+    if (this.followPlayer && game.player && game.player.alive) {
+      this.x = game.player.x;
+      this.y = game.player.y;
+    }
     this.duration -= dt;
     if (this.duration <= 0) {
       this.alive = false;
@@ -509,7 +540,55 @@ export class AOEZone {
 
     const progress = 1 - (this.duration / this.maxDuration);
 
-    if (this.type === "sonic_wave") {
+    if (this.type === "player_aura") {
+      this.tickTimer += dt;
+      if (this.tickTimer >= this.tickInterval) {
+        this.tickTimer = 0;
+        game.enemies.forEach(enemy => {
+          if (!enemy.alive) return;
+          const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
+          if (dist <= this.radius + enemy.radius) {
+            enemy.takeDamage(this.damage, false, game, { x: this.x, y: this.y, force: 120 });
+            game.particles.push(new Particle(enemy.x, enemy.y, (Math.random() - 0.5) * 70, (Math.random() - 0.5) * 70, "#a855f7", 3, 0.22, "spark"));
+          }
+        });
+      }
+    } else if (this.type === "projector_beam") {
+      game.enemies.forEach(enemy => {
+        if (enemy.alive && !this.hitEnemies.has(enemy)) {
+          const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
+          if (dist <= this.radius + enemy.radius) {
+            const eAngle = Math.atan2(enemy.y - this.y, enemy.x - this.x);
+            let diff = Math.abs(eAngle - this.angle);
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            diff = Math.abs(diff);
+            if (diff <= this.arc / 2) {
+              this.hitEnemies.add(enemy);
+              enemy.takeDamage(this.damage, false, game, this.knockbackForce > 0 ? { x: this.x, y: this.y, force: this.knockbackForce } : null);
+            }
+          }
+        }
+      });
+    } else if (this.type === "server_crash_blast") {
+      game.enemies.forEach(enemy => {
+        if (enemy.alive && !this.hitEnemies.has(enemy)) {
+          const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
+          if (dist <= this.radius + enemy.radius) {
+            this.hitEnemies.add(enemy);
+            enemy.takeDamage(this.damage, true, game, { x: this.x, y: this.y, force: 360 });
+          }
+        }
+      });
+    } else if (this.type === "boss_pulse") {
+      if (game.player && game.player.alive && !this.playerHit) {
+        const curRadius = this.radius * progress;
+        const dist = Math.hypot(game.player.x - this.x, game.player.y - this.y);
+        if (dist <= curRadius + game.player.radius) {
+          this.playerHit = true;
+          game.player.takeDamage(this.damage, this.owner, game, true);
+        }
+      }
+    } else if (this.type === "sonic_wave") {
       const curRadius = this.radius * progress;
       game.enemies.forEach(enemy => {
         if (enemy.alive && !this.hitEnemies.has(enemy)) {
@@ -668,7 +747,7 @@ export class AOEZone {
           this.tickTimer += dt;
           if (this.tickTimer >= 0.35) {
             this.tickTimer = 0;
-            p.takeDamage(this.damage, null, game, true);
+            p.takeDamage(this.damage, this.owner, game, true);
             game.addFloatingText(p.x, p.y - 25, "⚠️ 需求越界！", "#ef4444", 13);
           }
         }
@@ -698,7 +777,43 @@ export class AOEZone {
     ctx.save();
     const progress = 1 - (this.duration / this.maxDuration);
 
-    if (this.type === "sonic_wave") {
+    if (this.type === "player_aura") {
+      const pulse = 0.88 + Math.sin(progress * Math.PI * 10) * 0.08;
+      ctx.fillStyle = "rgba(126, 34, 206, 0.14)";
+      ctx.strokeStyle = "rgba(196, 181, 253, 0.9)";
+      ctx.lineWidth = 4;
+      ctx.shadowColor = "#a855f7";
+      ctx.shadowBlur = 18;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius * pulse, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+    } else if (this.type === "projector_beam") {
+      ctx.fillStyle = `rgba(250, 204, 21, ${0.42 * (1 - progress)})`;
+      ctx.strokeStyle = "#fde047";
+      ctx.lineWidth = 3;
+      ctx.shadowColor = "#facc15";
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.moveTo(this.x, this.y);
+      ctx.arc(this.x, this.y, this.radius, this.angle - this.arc / 2, this.angle + this.arc / 2);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    } else if (this.type === "server_crash_blast") {
+      const curR = this.radius * Math.min(1, progress * 1.6);
+      const grad = ctx.createRadialGradient(this.x, this.y, 4, this.x, this.y, curR);
+      grad.addColorStop(0, "rgba(255,255,255,0.95)");
+      grad.addColorStop(0.35, "rgba(251,191,36,0.8)");
+      grad.addColorStop(0.72, "rgba(245,158,11,0.5)");
+      grad.addColorStop(1, "rgba(245,158,11,0)");
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(this.x, this.y, curR, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(253,230,138,0.9)";
+      ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(this.x, this.y, curR, 0, Math.PI * 2); ctx.stroke();
+    } else if (this.type === "boss_pulse") {
+      const curR = this.radius * progress;
+      ctx.strokeStyle = `rgba(239, 68, 68, ${1 - progress})`;
+      ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.arc(this.x, this.y, curR, 0, Math.PI * 2); ctx.stroke();
+    } else if (this.type === "sonic_wave") {
       const curR = this.radius * progress;
       ctx.strokeStyle = this.isEvo ? `rgba(239, 68, 68, ${1 - progress})` : `rgba(56, 189, 248, ${1 - progress})`;
       ctx.lineWidth = this.isEvo ? 6 : 3.5;
@@ -951,6 +1066,13 @@ export class Player {
     this.acFreezeTimer = 0;
     this.acHeatTimer = 0;
     this.acFusionTimer = 0;
+    this.wirelessMouseTimer = 0;
+    this.staplerTimer = 0;
+    this.printerStormTimer = 0;
+    this.projectorTimer = 0;
+    this.serverCrashTimer = 0;
+    this.dodgeDirX = 1;
+    this.dodgeDirY = 0;
     this.renderDirection = "right";
     this.animTime = 0;
     this.attackAnimTimer = 0;
@@ -1024,6 +1146,21 @@ export class Player {
       speed *= (1 + SKILLS.boss_is_coming.speedBonus[this.skills.boss_is_coming - 1]);
     }
     if (this.pressure >= 50 && this.pressure < 80) speed *= 1.10;
+    if (this.characterId === "horn_mecha" && this.activeSkillDurationTimer > 0) speed *= 1.28;
+
+    if (this.dodgeTimer > 0) {
+      this.isMoving = true;
+      this.vx = this.dodgeDirX;
+      this.vy = this.dodgeDirY;
+      this.faceX = this.dodgeDirX;
+      this.faceY = this.dodgeDirY;
+      this.x += this.dodgeDirX * PLAYER_BASE.dodgeSpeed * dt;
+      this.y += this.dodgeDirY * PLAYER_BASE.dodgeSpeed * dt;
+      this.x = Math.max(this.radius + 10, Math.min(game.mapWidth - this.radius - 10, this.x));
+      this.y = Math.max(this.radius + 10, Math.min(game.mapHeight - this.radius - 10, this.y));
+      this.speedMult = 1.0;
+      return;
+    }
 
     let moveX = 0;
     let moveY = 0;
@@ -1154,6 +1291,11 @@ export class Player {
     if (this.weapons.chair) this.updateChair(dt, game);
     if (this.weapons.ac_freeze) this.updateAcFreeze(dt, game);
     if (this.weapons.ac_heat) this.updateAcHeat(dt, game);
+    if (this.weapons.wireless_mouse) this.updateWirelessMouse(dt, game);
+    if (this.weapons.stapler) this.updateStapler(dt, game);
+    if (this.weapons.printer_storm) this.updatePrinterStorm(dt, game);
+    if (this.weapons.projector) this.updateProjector(dt, game);
+    if (this.weapons.server_crash) this.updateServerCrash(dt, game);
     if ((this.weapons.ac_freeze && this.weapons.ac_heat) || this.evolvedWeapons.ac_fusion_evo) {
       this.updateAcFusion(dt, game);
     }
@@ -1443,6 +1585,116 @@ export class Player {
     }
   }
 
+  updateWirelessMouse(dt, game) {
+    const lvl = this.weapons.wireless_mouse;
+    let interval = 0.68;
+    if (lvl >= 3) interval *= 0.82;
+    interval /= this.getAttackSpeedMult();
+    this.wirelessMouseTimer += dt;
+    if (this.wirelessMouseTimer < interval) return;
+    this.wirelessMouseTimer = 0;
+    const target = game.getOptimalTarget(9 * M_TO_PX, 110) || game.getNearestEnemy(this.x, this.y, 9 * M_TO_PX);
+    if (!target) return;
+    let dmg = 18;
+    if (lvl >= 2) dmg *= 1.25;
+    if (lvl >= 5) dmg *= 1.30;
+    dmg *= this.getDamageMultiplier();
+    const count = lvl >= 4 ? 2 : 1;
+    for (let i = 0; i < count; i++) {
+      const angle = Math.atan2(target.y - this.y, target.x - this.x) + (i - (count - 1) / 2) * 0.10;
+      game.projectiles.push(new Projectile({ x:this.x, y:this.y, vx:Math.cos(angle)*520, vy:Math.sin(angle)*520, damage:dmg, radius:7, life:1.45, pierce:lvl>=5?1:0, type:"mouse_bullet" }));
+    }
+  }
+
+  updateStapler(dt, game) {
+    const lvl = this.weapons.stapler;
+    let interval = 1.35;
+    if (lvl >= 4) interval *= 0.82;
+    interval /= this.getAttackSpeedMult();
+    this.staplerTimer += dt;
+    if (this.staplerTimer < interval) return;
+    this.staplerTimer = 0;
+    const target = game.getOptimalTarget(8 * M_TO_PX, 120) || game.getNearestEnemy(this.x, this.y, 8 * M_TO_PX);
+    if (!target) return;
+    let dmg = 16;
+    if (lvl >= 2) dmg *= 1.22;
+    if (lvl >= 5) dmg *= 1.30;
+    dmg *= this.getDamageMultiplier();
+    const count = lvl >= 3 ? 5 : 3;
+    const base = Math.atan2(target.y - this.y, target.x - this.x);
+    for (let i = 0; i < count; i++) {
+      const angle = base + (i - (count - 1) / 2) * 0.12;
+      game.projectiles.push(new Projectile({ x:this.x, y:this.y, vx:Math.cos(angle)*620, vy:Math.sin(angle)*620, damage:dmg, radius:4, life:1.2, pierce:lvl>=5?1:0, type:"staple_bullet" }));
+    }
+  }
+
+  updatePrinterStorm(dt, game) {
+    const lvl = this.weapons.printer_storm;
+    let interval = 2.6;
+    if (lvl >= 3) interval *= 0.82;
+    interval /= this.getAttackSpeedMult();
+    this.printerStormTimer += dt;
+    if (this.printerStormTimer < interval) return;
+    this.printerStormTimer = 0;
+    let dmg = 20;
+    if (lvl >= 2) dmg *= 1.20;
+    if (lvl >= 5) dmg *= 1.35;
+    dmg *= this.getDamageMultiplier();
+    let count = 8;
+    if (lvl >= 2) count = 10;
+    if (lvl >= 4) count = 12;
+    for (let i = 0; i < count; i++) {
+      const angle = i * Math.PI * 2 / count;
+      game.projectiles.push(new Projectile({ x:this.x, y:this.y, vx:Math.cos(angle)*350, vy:Math.sin(angle)*350, damage:dmg, radius:6, life:1.75, pierce:lvl>=5?1:0, knockback:lvl>=4, type:"paper_bullet" }));
+    }
+  }
+
+  updateProjector(dt, game) {
+    const lvl = this.weapons.projector;
+    let interval = 3.4;
+    if (lvl >= 4) interval *= 0.80;
+    interval /= this.getAttackSpeedMult();
+    this.projectorTimer += dt;
+    if (this.projectorTimer < interval) return;
+    this.projectorTimer = 0;
+    const target = game.getOptimalTarget(7 * M_TO_PX, 150) || game.getNearestEnemy(this.x, this.y, 7 * M_TO_PX);
+    if (!target) return;
+    let dmg = 62;
+    if (lvl >= 2) dmg *= 1.25;
+    if (lvl >= 5) dmg *= 1.35;
+    dmg *= this.getDamageMultiplier();
+    let range = 5.2 * M_TO_PX * this.getAoERangeMult();
+    if (lvl >= 3) range *= 1.18;
+    const arc = (lvl >= 3 ? 135 : 110) * Math.PI / 180;
+    const angle = Math.atan2(target.y - this.y, target.x - this.x);
+    game.aoeZones.push(new AOEZone({ x:this.x, y:this.y, radius:range, duration:0.48, damage:dmg, type:"projector_beam", angle, arc, knockbackForce:lvl>=5?300:120 }));
+  }
+
+  updateServerCrash(dt, game) {
+    const lvl = this.weapons.server_crash;
+    let interval = lvl >= 4 ? 6.8 : 8.5;
+    interval /= this.getAttackSpeedMult();
+    this.serverCrashTimer += dt;
+    if (this.serverCrashTimer < interval) return;
+    this.serverCrashTimer = 0;
+    const target = game.getOptimalTarget(12 * M_TO_PX, 180) || game.getNearestEnemy(this.x, this.y, 12 * M_TO_PX);
+    if (!target) return;
+    let dmg = 150;
+    if (lvl >= 2) dmg *= 1.28;
+    if (lvl >= 5) dmg *= 1.40;
+    dmg *= this.getDamageMultiplier();
+    let radius = 4.8 * M_TO_PX * this.getAoERangeMult();
+    if (lvl >= 3) radius *= 1.22;
+    const tx = target.x, ty = target.y;
+    game.addFloatingText(tx, ty - 35, "🖥️💥 服务器宕机！", "#fbbf24", 18);
+    game.aoeZones.push(new AOEZone({ x:tx, y:ty, radius, duration:0.58, damage:dmg, type:"server_crash_blast" }));
+    if (lvl >= 5) {
+      setTimeout(() => {
+        if (this.alive) game.aoeZones.push(new AOEZone({ x:tx, y:ty, radius:radius*1.08, duration:0.48, damage:dmg*0.55, type:"server_crash_blast" }));
+      }, 420);
+    }
+  }
+
   updateAcFreeze(dt, game) {
     const lvl = this.weapons.ac_freeze;
     let baseInterval = 2.5;
@@ -1570,10 +1822,25 @@ export class Player {
     if (this.skills.elevator_dash) {
       this.dodgeCooldownTimer *= (1 - SKILLS.elevator_dash.dodgeCdReduc[this.skills.elevator_dash - 1]);
     }
+    let dx = 0, dy = 0;
+    if (game.keys?.['KeyW'] || game.keys?.['ArrowUp']) dy -= 1;
+    if (game.keys?.['KeyS'] || game.keys?.['ArrowDown']) dy += 1;
+    if (game.keys?.['KeyA'] || game.keys?.['ArrowLeft']) dx -= 1;
+    if (game.keys?.['KeyD'] || game.keys?.['ArrowRight']) dx += 1;
+    if (game.joystick && Math.hypot(game.joystick.x, game.joystick.y) > 0.08) {
+      dx = game.joystick.x; dy = game.joystick.y;
+    }
+    let len = Math.hypot(dx, dy);
+    if (len < 0.05) { dx = this.faceX || 1; dy = this.faceY || 0; len = Math.hypot(dx, dy) || 1; }
+    this.dodgeDirX = dx / len;
+    this.dodgeDirY = dy / len;
+    this.faceX = this.dodgeDirX;
+    this.faceY = this.dodgeDirY;
+    this.renderDirection = directionFromVector(this.dodgeDirX, this.dodgeDirY, this.renderDirection);
     this.dodgeTimer = PLAYER_BASE.dodgeDuration;
-    this.invulnerableTimer = PLAYER_BASE.dodgeDuration + 0.08;
-    this.speedMult = 2.4;
+    this.invulnerableTimer = PLAYER_BASE.dodgeDuration + 0.10;
     this.dodgeAttackBuffTimer = 1.5;
+    this.isMoving = true;
     sound.playDodge();
   }
 
@@ -1600,11 +1867,13 @@ export class Player {
       this.paidPoopInvulnTimer = 3.0;
       this.speedMult = 2.2;
     } else if (this.characterId === "horn_mecha") {
-      this.activeSkillDurationTimer = 0.9;
-      this.invulnerableTimer = Math.max(this.invulnerableTimer, 0.9);
-      this.speedMult = 2.6;
-      game.aoeZones.push(new AOEZone({ x: this.x, y: this.y, radius: 3.1 * M_TO_PX, duration: 0.35, damage: 95 * this.getDamageMultiplier(), type: "chair_spin", sweetSpotMult: 1.9, isEvo: false }));
-      game.addFloatingText(this.x, this.y - 58, "🦄 角虎机动冲击！", "#a855f7", 18);
+      this.activeSkillDurationTimer = this.charConf.active?.duration || 3.0;
+      this.invulnerableTimer = Math.max(this.invulnerableTimer, 0.22);
+      game.aoeZones.push(new AOEZone({
+        x: this.x, y: this.y, radius: 3.2 * M_TO_PX, duration: this.activeSkillDurationTimer,
+        damage: 30 * this.getDamageMultiplier(), tickInterval: 0.25, type: "player_aura", followPlayer: true, owner: this
+      }));
+      game.addFloatingText(this.x, this.y - 58, "🦄 机动能量场展开！", "#a855f7", 18);
     }
   }
 
@@ -1929,6 +2198,43 @@ export class BaseBoss {
     }
   }
 
+  moveTowardPlayer(dt, player, speed) {
+    const dx = player.x - this.x;
+    const dy = player.y - this.y;
+    let dist = Math.hypot(dx, dy);
+    const minDist = this.radius + player.radius + 2;
+    if (dist < 0.001) {
+      this.x -= minDist;
+      dist = minDist;
+    } else if (dist > minDist) {
+      const step = Math.min(speed * dt, dist - minDist);
+      this.x += (dx / dist) * step;
+      this.y += (dy / dist) * step;
+    } else if (dist < minDist - 1) {
+      const nx = dx / dist, ny = dy / dist;
+      this.x = player.x - nx * minDist;
+      this.y = player.y - ny * minDist;
+    }
+    return Math.hypot(player.x - this.x, player.y - this.y);
+  }
+
+  handleContactDamage(player, game) {
+    const dx = player.x - this.x;
+    const dy = player.y - this.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const minDist = this.radius + player.radius + 4;
+    if (dist <= minDist) {
+      const nx = dx / dist, ny = dy / dist;
+      player.x = this.x + nx * minDist;
+      player.y = this.y + ny * minDist;
+      const now = Date.now();
+      if (now - this.lastContactDmgTime >= 700) {
+        this.lastContactDmgTime = now;
+        player.takeDamage(this.damage, this, game);
+      }
+    }
+  }
+
   takeDamage(amount, isCrit, game) {
     if (!this.alive) return;
     const actual = amount * (1 - this.dmgReduction);
@@ -1941,6 +2247,8 @@ export class BaseBoss {
     this.alive = false;
     game.triggerSlowMotion(0.4, 0.25);
     game.projectiles = game.projectiles.filter(p => !p.isEnemy);
+    game.aoeZones = game.aoeZones.filter(z => z.owner !== this);
+    game.obstacles = game.obstacles.filter(o => o.owner !== this);
     game.drops.push(new DropItem(this.x, this.y, 'punch_card'));
     sound.playVictory();
     game.addFloatingText(this.x, this.y - 45, `🎉 ${this.name} 被击溃！打卡下班！`, "#fbbf24", 24);
@@ -2006,12 +2314,8 @@ export class SupervisorBoss extends BaseBoss {
       sound.playBossWarning();
     }
 
-    const dx = player.x - this.x;
-    const dy = player.y - this.y;
-    const dist = Math.hypot(dx, dy) || 1;
     const spd = this.speed * (this.currentPhase === 3 ? 1.25 : 1.0) * (this.freezeTimer > 0 ? 0.5 : 1.0);
-    this.x += (dx / dist) * spd * dt;
-    this.y += (dy / dist) * spd * dt;
+    this.moveTowardPlayer(dt, player, spd);
 
     this.actionTimer += dt;
     if (this.actionTimer >= (this.currentPhase === 3 ? 3.2 : 4.5)) {
@@ -2019,13 +2323,7 @@ export class SupervisorBoss extends BaseBoss {
       this.castSkill(player, game);
     }
 
-    if (dist <= this.radius + player.radius) {
-      const now = Date.now();
-      if (now - this.lastContactDmgTime >= PLAYER_BASE.contactDmgCd * 1000) {
-        this.lastContactDmgTime = now;
-        player.takeDamage(this.damage, this, game);
-      }
-    }
+    this.handleContactDamage(player, game);
   }
 
   castSkill(player, game) {
@@ -2035,11 +2333,13 @@ export class SupervisorBoss extends BaseBoss {
       for (let i = 0; i < 5; i++) {
         setTimeout(() => {
           if (this.alive && player.alive) {
+            const targetX = player.x;
+            const targetY = player.y;
             game.aoeZones.push(new AOEZone({
-              x: player.x, y: player.y, radius: 1.4 * M_TO_PX, duration: 0.7, type: "boss_warning_circle",
+              x: targetX, y: targetY, radius: 1.4 * M_TO_PX, duration: 0.7, type: "boss_warning_circle", owner: this,
               onComplete: () => {
                 sound.playExplosion(false);
-                if (Math.hypot(player.x - this.x, player.y - this.y) <= 1.4 * M_TO_PX + player.radius) {
+                if (this.alive && player.alive && Math.hypot(player.x - targetX, player.y - targetY) <= 1.4 * M_TO_PX + player.radius) {
                   player.takeDamage(this.damage * 0.9, this, game, true);
                 }
               }
@@ -2080,12 +2380,8 @@ export class DemandingClientBoss extends BaseBoss {
       sound.playBossWarning();
     }
 
-    const dx = player.x - this.x;
-    const dy = player.y - this.y;
-    const dist = Math.hypot(dx, dy) || 1;
     const spd = this.speed * (this.freezeTimer > 0 ? 0.5 : 1.0);
-    this.x += (dx / dist) * spd * dt;
-    this.y += (dy / dist) * spd * dt;
+    this.moveTowardPlayer(dt, player, spd);
 
     this.actionTimer += dt;
     if (this.actionTimer >= (this.currentPhase === 3 ? 3.0 : 4.2)) {
@@ -2093,13 +2389,7 @@ export class DemandingClientBoss extends BaseBoss {
       this.castClientSkill(player, game);
     }
 
-    if (dist <= this.radius + player.radius) {
-      const now = Date.now();
-      if (now - this.lastContactDmgTime >= PLAYER_BASE.contactDmgCd * 1000) {
-        this.lastContactDmgTime = now;
-        player.takeDamage(this.damage, this, game);
-      }
-    }
+    this.handleContactDamage(player, game);
   }
 
   castClientSkill(player, game) {
@@ -2110,11 +2400,11 @@ export class DemandingClientBoss extends BaseBoss {
       const pX = player.x;
       const pY = player.y;
       game.aoeZones.push(new AOEZone({
-        x: pX, y: pY, duration: 6.0, type: "demand_red_line", damage: 16,
+        x: pX, y: pY, duration: 6.0, type: "demand_red_line", damage: 16, owner: this,
         lineStartX: pX - 220, lineStartY: pY - 80, lineEndX: pX + 220, lineEndY: pY - 80
       }));
       game.aoeZones.push(new AOEZone({
-        x: pX, y: pY, duration: 6.0, type: "demand_red_line", damage: 16,
+        x: pX, y: pY, duration: 6.0, type: "demand_red_line", damage: 16, owner: this,
         lineStartX: pX - 220, lineStartY: pY + 80, lineEndX: pX + 220, lineEndY: pY + 80
       }));
     } else if (r < 0.70) {
@@ -2126,14 +2416,14 @@ export class DemandingClientBoss extends BaseBoss {
         const ox = Math.max(40, Math.min(game.mapWidth - 40, player.x + Math.cos(angle) * dist));
         const oy = Math.max(40, Math.min(game.mapHeight - 40, player.y + Math.sin(angle) * dist));
         game.obstacles.push(new TerrainObstacle({
-          x: ox, y: oy, hp: 80, name: "巨型合同公文柱", icon: "📑", color: "#ec4899"
+          x: ox, y: oy, hp: 80, name: "巨型合同公文柱", icon: "📑", color: "#ec4899", owner: this
         }));
       }
     } else {
       game.addFloatingText(this.x, this.y - 30, "🌀 方案打回！全部重做！", "#a855f7", 17);
       sound.playSonicWave(true);
       game.aoeZones.push(new AOEZone({
-        x: this.x, y: this.y, radius: 6.0 * M_TO_PX, duration: 3.5, type: "vortex_pull"
+        x: this.x, y: this.y, radius: 6.0 * M_TO_PX, duration: 3.5, type: "vortex_pull", owner: this
       }));
       for (let i = 0; i < 8; i++) {
         const angle = (i * Math.PI * 2) / 8;
@@ -2170,12 +2460,8 @@ export class HarassmentCallBoss extends BaseBoss {
       sound.playBossWarning();
     }
 
-    const dx = player.x - this.x;
-    const dy = player.y - this.y;
-    const dist = Math.hypot(dx, dy) || 1;
     const spd = this.speed * (this.freezeTimer > 0 ? 0.5 : 1.0);
-    this.x += (dx / dist) * spd * dt;
-    this.y += (dy / dist) * spd * dt;
+    this.moveTowardPlayer(dt, player, spd);
 
     this.actionTimer += dt;
     if (this.actionTimer >= (this.currentPhase === 3 ? 2.8 : 3.8)) {
@@ -2183,13 +2469,7 @@ export class HarassmentCallBoss extends BaseBoss {
       this.castCallSkill(player, game);
     }
 
-    if (dist <= this.radius + player.radius) {
-      const now = Date.now();
-      if (now - this.lastContactDmgTime >= PLAYER_BASE.contactDmgCd * 1000) {
-        this.lastContactDmgTime = now;
-        player.takeDamage(this.damage, this, game);
-      }
-    }
+    this.handleContactDamage(player, game);
   }
 
   castCallSkill(player, game) {
@@ -2202,7 +2482,7 @@ export class HarassmentCallBoss extends BaseBoss {
         const ox = Math.max(40, Math.min(game.mapWidth - 40, player.x + Math.cos(angle) * 140));
         const oy = Math.max(40, Math.min(game.mapHeight - 40, player.y + Math.sin(angle) * 140));
         game.obstacles.push(new TerrainObstacle({
-          x: ox, y: oy, hp: 60, type: "phone_tower", name: "响铃分机", icon: "📞", color: "#06b6d4"
+          x: ox, y: oy, hp: 60, type: "phone_tower", name: "响铃分机", icon: "📞", color: "#06b6d4", owner: this
         }));
       }
     } else if (r < 0.75) {
@@ -2223,7 +2503,7 @@ export class HarassmentCallBoss extends BaseBoss {
       game.addFloatingText(this.x, this.y - 30, "⚡ EMP信号全场过载！", "#eab308", 18);
       sound.playElectricWhip(true);
       game.aoeZones.push(new AOEZone({
-        x: this.x, y: this.y, radius: 8.0 * M_TO_PX, duration: 0.6, damage: this.damage * 0.8, type: "sonic_wave", isEvo: true
+        x: this.x, y: this.y, radius: 8.0 * M_TO_PX, duration: 0.75, damage: this.damage * 0.8, type: "boss_pulse", owner: this
       }));
       for (let i = 0; i < 4; i++) {
         game.enemies.push(new Enemy("red_dot", this.x + (Math.random() - 0.5) * 60, this.y + (Math.random() - 0.5) * 60));

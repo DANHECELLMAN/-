@@ -1,11 +1,11 @@
 /**
- * 《今天也不想上班》- 核心游戏引擎与状态机 (V1.5 终极优化版)
+ * 《今天也不想上班》- 核心游戏引擎与状态机 (V1.7 Bug修复与武器池扩展版)
  */
 
-import { M_TO_PX, CHARACTERS, PLAYER_BASE, PRESSURE_STAGES, WEAPONS, SKILLS, ARTIFACTS, UPGRADE_SYSTEM, TALENTS, STAGES_CONFIG } from './constants.js';
-import { Player, DamageNumber, FloatingText, Particle, DropItem, Projectile, AOEZone, TerrainObstacle, createBossInstance } from './entities.js';
-import { WaveDirector } from './director.js';
-import { sound } from './audio.js';
+import { M_TO_PX, CHARACTERS, PLAYER_BASE, PRESSURE_STAGES, WEAPONS, SKILLS, ARTIFACTS, UPGRADE_SYSTEM, TALENTS, STAGES_CONFIG } from './constants.js?v=1.7';
+import { Player, DamageNumber, FloatingText, Particle, DropItem, Projectile, AOEZone, TerrainObstacle, createBossInstance } from './entities.js?v=1.7';
+import { WaveDirector } from './director.js?v=1.7';
+import { sound } from './audio.js?v=1.7';
 
 export class GameEngine {
   constructor(canvas) {
@@ -304,77 +304,132 @@ export class GameEngine {
     return this.getOptimalTarget(maxDist, 140);
   }
 
-  generateUpgradeChoices() {
-    const choices = [];
-    const p = this.player;
+  getRarityMeta(rarity = "common") {
+    const table = {
+      common: { name: "普通", weight: 55 },
+      rare: { name: "稀有", weight: 28 },
+      epic: { name: "史诗", weight: 13 },
+      legendary: { name: "传说", weight: 4 }
+    };
+    return table[rarity] || table.common;
+  }
 
-    // 检查武器超级进化与组合共鸣
+  weightedPick(pool, excludeKeys = new Set()) {
+    const candidates = pool.filter(item => !excludeKeys.has(`${item.type}:${item.id}`));
+    if (!candidates.length) return null;
+    let total = 0;
+    const weighted = candidates.map(item => {
+      let weight = Math.max(0.01, item.weight || 1);
+      if (this.player?.characterId === "xiaozhang" && (item.rarity === "epic" || item.rarity === "legendary")) {
+        weight *= 1.45;
+      }
+      total += weight;
+      return { item, weight };
+    });
+    let roll = Math.random() * total;
+    for (const entry of weighted) {
+      roll -= entry.weight;
+      if (roll <= 0) return entry.item;
+    }
+    return weighted[weighted.length - 1].item;
+  }
+
+  generateUpgradeChoices() {
+    const p = this.player;
+    const ownedWeaponUpgrades = [];
+    const randomPool = [];
+
+    // 满足条件的超级进化进入随机池。
     for (const wKey in WEAPONS) {
       const wConf = WEAPONS[wKey];
-      if (wConf.evolution && !p.evolvedWeapons[wConf.evolution.id]) {
-        let canEvo = true;
-        const reqs = wConf.evolution.req;
-        for (const reqKey in reqs) {
-          const reqVal = reqs[reqKey];
-          if (WEAPONS[reqKey]) {
-            if ((p.weapons[reqKey] || 0) < reqVal) canEvo = false;
-          } else if (SKILLS[reqKey]) {
-            if ((p.skills[reqKey] || 0) < reqVal) canEvo = false;
-          }
-        }
-        if (canEvo) {
-          choices.push({
-            type: 'EVOLUTION',
-            id: wConf.evolution.id,
-            baseWeapon: wKey,
-            name: wConf.evolution.name,
-            icon: wConf.evolution.icon,
-            tag: '🌟 超级进化',
-            desc: wConf.evolution.desc
-          });
+      if (!wConf.evolution || p.evolvedWeapons[wConf.evolution.id]) continue;
+      let canEvo = true;
+      const reqs = wConf.evolution.req || {};
+      for (const reqKey in reqs) {
+        const reqVal = reqs[reqKey];
+        if (WEAPONS[reqKey]) {
+          if ((p.weapons[reqKey] || 0) < reqVal) canEvo = false;
+        } else if (SKILLS[reqKey]) {
+          if ((p.skills[reqKey] || 0) < reqVal) canEvo = false;
         }
       }
-    }
-
-    // 可用武器升级
-    for (const wKey in WEAPONS) {
-      const wConf = WEAPONS[wKey];
-      if (wKey === "ac_fusion_evo") continue;
-      const curLvl = p.weapons[wKey] || 0;
-      if (curLvl < 5) {
-        const nextLvl = curLvl + 1;
-        const lvlInfo = wConf.levels[nextLvl - 1];
-        choices.push({
-          type: 'WEAPON',
-          id: wKey,
-          name: `${wConf.name} Lv.${nextLvl}`,
-          icon: wConf.icon,
-          tag: curLvl === 0 ? '✨ 新武器' : wConf.tag,
-          desc: lvlInfo.desc
+      if (canEvo) {
+        randomPool.push({
+          type: 'EVOLUTION', id: wConf.evolution.id, baseWeapon: wKey,
+          name: wConf.evolution.name, icon: wConf.evolution.icon,
+          tag: '🌟 超级进化', desc: wConf.evolution.desc,
+          rarity: 'legendary', rarityLabel: '传说', weight: 18
         });
       }
     }
 
-    // 可用技能升级
+    // 已拥有武器和未拥有武器分池。
+    for (const wKey in WEAPONS) {
+      const wConf = WEAPONS[wKey];
+      if (wKey === "ac_fusion_evo" || !wConf.levels) continue;
+      const curLvl = p.weapons[wKey] || 0;
+      if (curLvl >= 5) continue;
+      const nextLvl = curLvl + 1;
+      const lvlInfo = wConf.levels[nextLvl - 1];
+      const rarity = wConf.rarity || 'common';
+      const meta = this.getRarityMeta(rarity);
+      const choice = {
+        type: 'WEAPON', id: wKey, name: `${wConf.name} Lv.${nextLvl}`,
+        icon: wConf.icon,
+        tag: curLvl === 0 ? `✨ 新武器 · ${meta.name}` : `${wConf.tag} · ${meta.name}`,
+        desc: lvlInfo.desc, rarity, rarityLabel: meta.name,
+        weight: wConf.dropWeight || meta.weight, currentLevel: curLvl
+      };
+      if (curLvl > 0) ownedWeaponUpgrades.push(choice);
+      else randomPool.push(choice);
+    }
+
+    // 被动技能进入随机池。
     for (const sKey in SKILLS) {
       const sConf = SKILLS[sKey];
       const curLvl = p.skills[sKey] || 0;
-      if (curLvl < sConf.maxLevel) {
-        const nextLvl = curLvl + 1;
-        choices.push({
-          type: 'SKILL',
-          id: sKey,
-          name: `${sConf.name} Lv.${nextLvl}`,
-          icon: sConf.icon,
-          tag: sConf.tag,
-          desc: sConf.levelDescs[nextLvl - 1]
-        });
+      if (curLvl >= sConf.maxLevel) continue;
+      const nextLvl = curLvl + 1;
+      randomPool.push({
+        type: 'SKILL', id: sKey, name: `${sConf.name} Lv.${nextLvl}`,
+        icon: sConf.icon, tag: sConf.tag,
+        desc: sConf.levelDescs[nextLvl - 1], weight: 42
+      });
+    }
+
+    const result = [];
+    const used = new Set();
+
+    // 每次升级/刷新保证且仅保证一个“已拥有武器升级”。
+    if (ownedWeaponUpgrades.length > 0) {
+      const guaranteed = { ...ownedWeaponUpgrades[Math.floor(Math.random() * ownedWeaponUpgrades.length)] };
+      guaranteed.guaranteedOwnedUpgrade = true;
+      guaranteed.tag = `🔒 必出升级 · ${guaranteed.rarityLabel}`;
+      result.push(guaranteed);
+      used.add(`${guaranteed.type}:${guaranteed.id}`);
+    }
+
+    // 另外两个选项在新武器、技能、进化中按权重随机。
+    while (result.length < 3) {
+      const pick = this.weightedPick(randomPool, used);
+      if (!pick) break;
+      result.push({ ...pick });
+      used.add(`${pick.type}:${pick.id}`);
+    }
+
+    // 极端情况下补足3项。
+    if (result.length < 3) {
+      for (const fallback of ownedWeaponUpgrades) {
+        const key = `${fallback.type}:${fallback.id}`;
+        if (!used.has(key)) {
+          result.push({ ...fallback });
+          used.add(key);
+          if (result.length >= 3) break;
+        }
       }
     }
 
-    // 乱序抽取3项 (小张实习生额外有更高几率出稀有/超武)
-    choices.sort(() => Math.random() - 0.5);
-    return choices.slice(0, 3);
+    return result.sort(() => Math.random() - 0.5).slice(0, 3);
   }
 
   triggerLevelUpSelection() {
@@ -401,12 +456,14 @@ export class GameEngine {
 
     choices.forEach(choice => {
       const card = document.createElement('div');
-      card.className = `upgrade-card ${choice.type === 'EVOLUTION' ? 'evo-card' : ''}`;
+      const rarityClass = choice.rarity ? `rarity-${choice.rarity}` : '';
+      card.className = `upgrade-card ${choice.type === 'EVOLUTION' ? 'evo-card' : ''} ${rarityClass}`;
+      const rarityBadge = choice.rarityLabel ? `<span class="rarity-badge ${rarityClass}">${choice.rarityLabel}</span>` : '';
       card.innerHTML = `
         <div class="card-icon">${choice.icon}</div>
         <div class="card-body">
           <div class="card-header-line">
-            <div class="card-title">${choice.name}</div>
+            <div class="card-title">${choice.name} ${rarityBadge}</div>
             <div class="card-tag">${choice.tag}</div>
           </div>
           <div class="card-desc">${choice.desc}</div>
@@ -430,6 +487,7 @@ export class GameEngine {
       p.skills[choice.id] = (p.skills[choice.id] || 0) + 1;
     } else if (choice.type === 'EVOLUTION') {
       p.evolvedWeapons[choice.id] = true;
+      if (choice.baseWeapon) p.evolvedWeapons[choice.baseWeapon] = true;
       if (choice.id === "ac_fusion_evo") {
         p.evolvedWeapons.ac_fusion_evo = true;
       }
