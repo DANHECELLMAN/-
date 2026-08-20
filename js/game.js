@@ -552,7 +552,7 @@ export class GameEngine {
       card.className = `char-card ${isSelected ? 'selected' : ''}`;
       card.innerHTML = `
         <div class="char-card-header">
-          <div class="char-card-avatar">${char.avatar}</div>
+          <div class="char-card-avatar">${char.avatarImage ? `<img class="char-card-avatar-img" src="${new URL('../' + char.avatarImage, import.meta.url).href}" alt="${char.name}">` : char.avatar}</div>
           <div class="char-card-title-group">
             <div class="char-card-name">
               ${char.name}
@@ -833,7 +833,15 @@ export class GameEngine {
     const p = this.player;
     if (!p) return;
 
-    document.getElementById('hud-avatar').innerText = p.charConf.avatar;
+    const hudAvatar = document.getElementById('hud-avatar');
+    if (p.charConf.avatarImage) {
+      const src = new URL('../' + p.charConf.avatarImage, import.meta.url).href;
+      if (!hudAvatar.querySelector('img') || hudAvatar.querySelector('img').src !== src) {
+        hudAvatar.innerHTML = `<img class="hud-avatar-img" src="${src}" alt="${p.charConf.name}">`;
+      }
+    } else {
+      hudAvatar.innerText = p.charConf.avatar;
+    }
     document.getElementById('hud-hp-text').innerText = `${Math.max(0, Math.round(p.hp))} / ${Math.round(p.maxHp)}`;
     document.getElementById('hud-hp-fill').style.width = `${Math.max(0, Math.min(100, (p.hp / p.maxHp) * 100))}%`;
 

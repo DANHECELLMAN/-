@@ -837,18 +837,23 @@ function distToSegment(p, v, w) {
 
 
 const HORN_MECHA_DIR_ORDER = ["down", "down_left", "left", "up_left", "up", "up_right", "right", "down_right"];
+const HORN_MECHA_SPRITE_BASE = new URL("../assets/characters/horn_mecha/spritesheets/", import.meta.url);
+const hornSpriteUrl = (file) => new URL(file, HORN_MECHA_SPRITE_BASE).href;
 const HORN_MECHA_ANIMS = {
-  idle:   { src: "assets/characters/horn_mecha/spritesheets/idle_8dir.png", rows: 8, cols: 6, fps: 6, loop: true },
-  run:    { src: "assets/characters/horn_mecha/spritesheets/run_8dir.png", rows: 8, cols: 8, fps: 10, loop: true },
-  attack: { src: "assets/characters/horn_mecha/spritesheets/attack_8dir.png", rows: 8, cols: 8, fps: 14, loop: false },
-  dodge:  { src: "assets/characters/horn_mecha/spritesheets/dodge_8dir.png", rows: 8, cols: 6, fps: 18, loop: false },
-  hit:    { src: "assets/characters/horn_mecha/spritesheets/hit_8dir.png", rows: 8, cols: 4, fps: 12, loop: false },
-  death:  { src: "assets/characters/horn_mecha/spritesheets/death_8dir.png", rows: 8, cols: 10, fps: 10, loop: false }
+  idle:   { src: hornSpriteUrl("idle_8dir.png"), rows: 8, cols: 6, fps: 6, loop: true },
+  run:    { src: hornSpriteUrl("run_8dir.png"), rows: 8, cols: 8, fps: 10, loop: true },
+  attack: { src: hornSpriteUrl("attack_8dir.png"), rows: 8, cols: 8, fps: 14, loop: false },
+  dodge:  { src: hornSpriteUrl("dodge_8dir.png"), rows: 8, cols: 6, fps: 18, loop: false },
+  hit:    { src: hornSpriteUrl("hit_8dir.png"), rows: 8, cols: 4, fps: 12, loop: false },
+  death:  { src: hornSpriteUrl("death_8dir.png"), rows: 8, cols: 10, fps: 10, loop: false }
 };
 const hornMechaImageCache = {};
 function getHornMechaImage(src) {
   if (!hornMechaImageCache[src]) {
     const img = new Image();
+    img.decoding = "async";
+    img.onerror = () => console.error("[horn_mecha] Sprite load failed:", src);
+    img.onload = () => console.info("[horn_mecha] Sprite loaded:", src);
     img.src = src;
     hornMechaImageCache[src] = img;
   }
@@ -955,6 +960,9 @@ export class Player {
     this.damageMoveBuffTimer = 0;
     this.dodgeAttackBuffTimer = 0;
     this.isMoving = false;
+    if (this.characterId === "horn_mecha") {
+      Object.values(HORN_MECHA_ANIMS).forEach(meta => getHornMechaImage(meta.src));
+    }
   }
 
   triggerAttack(duration = 0.42) { this.attackAnimTimer = Math.max(this.attackAnimTimer, duration); }

@@ -133,6 +133,7 @@ export const CHARACTERS = {
     name: "角虎机甲",
     title: "同步作战原型",
     avatar: "🤖",
+    avatarImage: "assets/characters/horn_mecha/reference/character_reference.png",
     desc: "根据原创设计图接入的近中距离机甲角色，拥有稳定输出、短爆发与突进反制能力。",
     initialWeapon: "keyboard",
     baseStats: {
