@@ -902,3 +902,33 @@ body, html {
 .rarity-badge.rarity-rare { color: #60a5fa; }
 .rarity-badge.rarity-epic { color: #c084fc; }
 .rarity-badge.rarity-legendary { color: #fbbf24; font-weight: 800; }
+
+/* V1.8 手机横屏专项优化 */
+@media (orientation: landscape) and (max-height: 620px) {
+  .hud-top-bar { transform: scale(0.86); transform-origin: top left; width: 116%; }
+  .hud-bottom-center { bottom: max(8px, env(safe-area-inset-bottom)); transform: translateX(-50%) scale(0.88); }
+  #joystick-zone { width: 44vw; height: 100vh; }
+  #joystick-base {
+    width: 104px; height: 104px;
+    left: max(24px, env(safe-area-inset-left));
+    bottom: max(18px, env(safe-area-inset-bottom));
+  }
+  #joystick-nub { width: 44px; height: 44px; margin-left: -22px; margin-top: -22px; }
+  .action-buttons {
+    right: max(22px, env(safe-area-inset-right));
+    bottom: max(18px, env(safe-area-inset-bottom));
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 12px;
+  }
+  .action-btn { width: 64px; height: 64px; font-size: 10px; }
+  .action-btn span:first-child { font-size: 18px !important; }
+  .modal-content { max-height: 88vh; overflow-y: auto; }
+  .card-container { gap: 8px; }
+  .upgrade-card { min-height: 92px; padding: 10px; }
+}
+
+@media (orientation: portrait) and (max-width: 640px) {
+  .action-buttons { right: max(14px, env(safe-area-inset-right)); bottom: max(24px, env(safe-area-inset-bottom)); }
+  #joystick-base { left: max(22px, env(safe-area-inset-left)); bottom: max(26px, env(safe-area-inset-bottom)); }
+}
