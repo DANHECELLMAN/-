@@ -870,3 +870,35 @@ body, html {
   display: block;
   border-radius: 4px;
 }
+
+/* V1.7 武器稀有度样式 */
+.upgrade-card.rarity-common {
+  border-color: #64748b;
+}
+.upgrade-card.rarity-rare {
+  border-color: #3b82f6;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.18);
+}
+.upgrade-card.rarity-epic {
+  border-color: #a855f7;
+  background: linear-gradient(180deg, rgba(88, 28, 135, 0.35) 0%, #0f172a 100%);
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.24);
+}
+.upgrade-card.rarity-legendary {
+  border-color: #fbbf24;
+  background: linear-gradient(180deg, rgba(120, 53, 15, 0.55) 0%, #0f172a 100%);
+  box-shadow: 0 0 18px rgba(251, 191, 36, 0.42);
+}
+.rarity-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-size: 9px;
+  vertical-align: middle;
+  border: 1px solid currentColor;
+}
+.rarity-badge.rarity-common { color: #cbd5e1; }
+.rarity-badge.rarity-rare { color: #60a5fa; }
+.rarity-badge.rarity-epic { color: #c084fc; }
+.rarity-badge.rarity-legendary { color: #fbbf24; font-weight: 800; }
