@@ -1,11 +1,11 @@
 /**
- * 《今天也不想上班》- 核心游戏引擎与状态机 (V1.8 地图事件与移动端横屏优化版)
+ * 《今天也不想上班》- 核心游戏引擎与状态机 (V1.9 Boss稳定/稀疏奖励/强敌与真横屏修复版)
  */
 
-import { M_TO_PX, CHARACTERS, PLAYER_BASE, PRESSURE_STAGES, WEAPONS, SKILLS, ARTIFACTS, UPGRADE_SYSTEM, TALENTS, STAGES_CONFIG } from './constants.js?v=1.8';
-import { Player, DamageNumber, FloatingText, Particle, DropItem, Projectile, AOEZone, TerrainObstacle, createBossInstance } from './entities.js?v=1.8';
-import { WaveDirector } from './director.js?v=1.8';
-import { sound } from './audio.js?v=1.8';
+import { M_TO_PX, CHARACTERS, PLAYER_BASE, PRESSURE_STAGES, WEAPONS, SKILLS, ARTIFACTS, UPGRADE_SYSTEM, TALENTS, STAGES_CONFIG } from './constants.js?v=1.9';
+import { Player, DamageNumber, FloatingText, Particle, DropItem, Projectile, AOEZone, TerrainObstacle, createBossInstance } from './entities.js?v=1.9';
+import { WaveDirector } from './director.js?v=1.9';
+import { sound } from './audio.js?v=1.9';
 
 export class GameEngine {
   constructor(canvas) {
@@ -47,6 +47,11 @@ export class GameEngine {
     this.upgradeOfferHistory = [];
     this.upgradeOfferCounter = 0;
     this._resizeRaf = 0;
+    this.forceLandscapeFallback = false;
+    this.lastSafePlayerX = 0;
+    this.lastSafePlayerY = 0;
+    this.cameraX = 0;
+    this.cameraY = 0;
 
     this.initCanvasSize();
     this.initEventListeners();
@@ -86,13 +91,13 @@ export class GameEngine {
 
   initCanvasSize() {
     const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
-    const width = Math.max(320, window.innerWidth);
-    const height = Math.max(240, window.innerHeight);
+    const forcedPortraitRotate = this.forceLandscapeFallback && window.innerHeight > window.innerWidth;
+    const width = Math.max(320, forcedPortraitRotate ? window.innerHeight : window.innerWidth);
+    const height = Math.max(240, forcedPortraitRotate ? window.innerWidth : window.innerHeight);
     this.canvas.width = Math.round(width * dpr);
     this.canvas.height = Math.round(height * dpr);
     this.canvas.style.width = width + 'px';
     this.canvas.style.height = height + 'px';
-    // 关键修复：每次 resize/orientationchange 都重置 transform，避免 DPR 缩放重复累乘导致地图突然放大/缩小。
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.viewWidth = width;
     this.viewHeight = height;
@@ -107,6 +112,17 @@ export class GameEngine {
   }
 
   async requestLandscapeMode() {
+    // 再次点击可退出强制横屏回退。
+    if (this.forceLandscapeFallback) {
+      this.forceLandscapeFallback = false;
+      document.body.classList.remove('force-landscape');
+      try { if (screen.orientation?.unlock) screen.orientation.unlock(); } catch (e) {}
+      try { if (document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen(); } catch (e) {}
+      this.scheduleCanvasResize();
+      return { mode: 'normal' };
+    }
+
+    let nativeLocked = false;
     try {
       if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
         await document.documentElement.requestFullscreen();
@@ -115,9 +131,18 @@ export class GameEngine {
     try {
       if (screen.orientation && screen.orientation.lock) {
         await screen.orientation.lock('landscape');
+        nativeLocked = true;
       }
     } catch (e) {}
-    setTimeout(() => this.initCanvasSize(), 180);
+
+    // Android/Chrome优先使用系统横屏；iOS/Safari等不支持锁定时，直接旋转整个游戏容器作为可靠回退。
+    await new Promise(resolve => setTimeout(resolve, 140));
+    if (window.innerHeight > window.innerWidth) {
+      this.forceLandscapeFallback = true;
+      document.body.classList.add('force-landscape');
+    }
+    this.scheduleCanvasResize();
+    return { mode: this.forceLandscapeFallback ? 'css-rotated' : 'native-landscape' };
   }
 
   initEventListeners() {
@@ -155,10 +180,13 @@ export class GameEngine {
         const rect = joyBase.getBoundingClientRect();
         const centerX = rect.left + rect.width / 2;
         const centerY = rect.top + rect.height / 2;
-        const dx = touch.clientX - centerX;
-        const dy = touch.clientY - centerY;
+        const screenDx = touch.clientX - centerX;
+        const screenDy = touch.clientY - centerY;
+        // CSS强制横屏时容器顺时针旋转90°，触摸向量需转换回游戏本地坐标。
+        const dx = this.forceLandscapeFallback ? screenDy : screenDx;
+        const dy = this.forceLandscapeFallback ? -screenDx : screenDy;
         const dist = Math.hypot(dx, dy);
-        const maxR = rect.width / 2 - 10;
+        const maxR = Math.max(20, Math.min(rect.width, rect.height) / 2 - 10);
 
         if (dist > 0) {
           const nx = dx / dist;
@@ -201,6 +229,10 @@ export class GameEngine {
     this.mapHeight = stageConf.mapHeight;
 
     this.player = new Player(this, this.selectedCharacterId);
+    this.lastSafePlayerX = this.player.x;
+    this.lastSafePlayerY = this.player.y;
+    this.cameraX = Math.max(0, this.player.x - this.viewWidth / 2);
+    this.cameraY = Math.max(0, this.player.y - this.viewHeight / 2);
     this.enemies = [];
     this.projectiles = [];
     this.aoeZones = [];
@@ -242,15 +274,15 @@ export class GameEngine {
       stage_endless: ["夜班工位A", "夜班工位B", "服务器区", "空会议室", "自动售货区", "通宵休息角"]
     };
     const labels = labelsByStage[this.selectedStageId] || labelsByStage.stage_1;
-    const pad = 44;
     const zoneW = this.mapWidth / cols;
     const zoneH = this.mapHeight / rows;
     this.mapZones = [];
     this.zoneEvents = [];
+
     let idx = 0;
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
-        const zone = {
+        this.mapZones.push({
           id: `zone_${idx}`,
           name: labels[idx] || `办公区${idx + 1}`,
           x: c * zoneW,
@@ -258,22 +290,35 @@ export class GameEngine {
           w: zoneW,
           h: zoneH,
           index: idx
-        };
-        this.mapZones.push(zone);
-        const ex = zone.x + pad + Math.random() * Math.max(20, zone.w - pad * 2);
-        const ey = zone.y + pad + Math.random() * Math.max(20, zone.h - pad * 2);
-        this.zoneEvents.push({
-          zoneId: zone.id,
-          x: ex,
-          y: ey,
-          type: Math.random() < 0.52 ? 'weapon' : 'xp',
-          active: false,
-          respawn: 8 + Math.random() * 28,
-          pulse: Math.random() * Math.PI * 2
         });
         idx++;
       }
     }
+
+    // V1.9：不再每个区域都刷奖励。每张地图固定只有3个奖励点，且刷新很慢。
+    const zoneOrder = [...this.mapZones].sort(() => Math.random() - 0.5).slice(0, 3);
+    for (let i = 0; i < zoneOrder.length; i++) {
+      const zone = zoneOrder[i];
+      const pad = 70;
+      this.zoneEvents.push({
+        zoneId: zone.id,
+        x: zone.x + pad + Math.random() * Math.max(20, zone.w - pad * 2),
+        y: zone.y + pad + Math.random() * Math.max(20, zone.h - pad * 2),
+        active: false,
+        respawn: 35 + i * 25 + Math.random() * 30,
+        quality: this.rollMapRewardQuality(),
+        pulse: Math.random() * Math.PI * 2
+      });
+    }
+  }
+
+  rollMapRewardQuality() {
+    const r = Math.random();
+    if (r < 0.58) return 'junk';        // 58% 小垃圾：少量经验/回血/减压
+    if (r < 0.83) return 'common';      // 25% 普通
+    if (r < 0.95) return 'rare';        // 12% 稀有
+    if (r < 0.992) return 'epic';       // 4.2% 史诗
+    return 'legendary';                 // 0.8% 金色传说
   }
 
   updateZoneEvents(dt) {
@@ -282,56 +327,73 @@ export class GameEngine {
       ev.pulse += dt * 3;
       if (!ev.active) {
         ev.respawn -= dt;
-        if (ev.respawn <= 0) ev.active = true;
+        if (ev.respawn <= 0) {
+          ev.quality = this.rollMapRewardQuality();
+          ev.active = true;
+        }
         continue;
       }
       const dist = Math.hypot(this.player.x - ev.x, this.player.y - ev.y);
-      if (dist <= this.player.radius + 24) {
-        this.claimZoneEvent(ev);
-      }
+      if (dist <= this.player.radius + 24) this.claimZoneEvent(ev);
     }
   }
 
   claimZoneEvent(ev) {
     const zone = this.mapZones.find(z => z.id === ev.zoneId);
+    const q = ev.quality || 'junk';
     ev.active = false;
-    ev.respawn = 70 + Math.random() * 50;
+    ev.respawn = 125 + Math.random() * 70;
+
     if (zone) {
-      const pad = 52;
+      const pad = 72;
       ev.x = zone.x + pad + Math.random() * Math.max(20, zone.w - pad * 2);
       ev.y = zone.y + pad + Math.random() * Math.max(20, zone.h - pad * 2);
     }
-    if (ev.type === 'weapon') {
-      const eligible = Object.keys(WEAPONS).filter(k => WEAPONS[k]?.levels && k !== 'ac_fusion_evo' && (this.player.weapons[k] || 0) < 5);
-      const unowned = eligible.filter(k => !(this.player.weapons[k] > 0));
-      const source = unowned.length ? unowned : eligible;
-      if (source.length) {
-        const rarityWeight = { common: 44, rare: 32, epic: 18, legendary: 6 };
-        const groups = {};
-        for (const key of source) (groups[WEAPONS[key].rarity || 'common'] ||= []).push(key);
-        const rs = Object.keys(groups);
-        let total = rs.reduce((sum, r) => sum + (rarityWeight[r] || 1), 0);
-        let roll = Math.random() * total;
-        let chosenRarity = rs[0];
-        for (const r of rs) { roll -= rarityWeight[r] || 1; if (roll <= 0) { chosenRarity = r; break; } }
-        const bucket = groups[chosenRarity];
-        const k = bucket[Math.floor(Math.random() * bucket.length)];
-        this.player.weapons[k] = (this.player.weapons[k] || 0) + 1;
-        this.addFloatingText(this.player.x, this.player.y - 42, `🗃️ ${zone?.name || '办公区'}事件：获得 ${WEAPONS[k].name} Lv.${this.player.weapons[k]}`, '#fbbf24', 17);
-        sound.playUpgrade();
-      } else {
-        const xp = Math.max(24, Math.round(this.player.xpNeeded * 0.55));
-        this.player.addXp(xp);
-        this.addFloatingText(this.player.x, this.player.y - 42, `📚 武器已满：经验 +${xp}`, '#38bdf8', 17);
-        sound.playXp();
-      }
-    } else {
-      const xp = Math.max(18, Math.round(this.player.xpNeeded * (0.32 + Math.random() * 0.18)));
+
+    const giveXp = (ratio, min = 8) => {
+      const xp = Math.max(min, Math.round(this.player.xpNeeded * ratio));
       this.player.addXp(xp);
-      this.addFloatingText(this.player.x, this.player.y - 42, `📚 ${zone?.name || '办公区'}事件：经验 +${xp}`, '#38bdf8', 17);
+      this.addFloatingText(this.player.x, this.player.y - 42, `📦 ${zone?.name || '办公区'}：经验 +${xp}`, '#94a3b8', 15);
       sound.playXp();
+    };
+
+    if (q === 'junk') {
+      const r = Math.random();
+      if (r < 0.55) {
+        giveXp(0.12 + Math.random() * 0.08, 8);
+      } else if (r < 0.80) {
+        const heal = Math.max(5, Math.round(this.player.maxHp * 0.08));
+        this.player.heal(heal, this, true);
+        this.addFloatingText(this.player.x, this.player.y - 42, `☕ 小福利：回复 ${heal} HP`, '#10b981', 15);
+      } else {
+        this.player.reducePressure(10, this);
+        this.addFloatingText(this.player.x, this.player.y - 42, '🧃 摸鱼补给：压力 -10', '#38bdf8', 15);
+      }
+      ev.quality = this.rollMapRewardQuality();
+      return;
     }
-    ev.type = Math.random() < 0.52 ? 'weapon' : 'xp';
+
+    const rarityWanted = q;
+    const eligible = Object.keys(WEAPONS).filter(k => {
+      const w = WEAPONS[k];
+      return w?.levels && k !== 'ac_fusion_evo' && (this.player.weapons[k] || 0) < 5 && (w.rarity || 'common') === rarityWanted;
+    });
+    const unowned = eligible.filter(k => !(this.player.weapons[k] > 0));
+    const source = unowned.length ? unowned : eligible;
+
+    if (source.length) {
+      const k = source[Math.floor(Math.random() * source.length)];
+      this.player.weapons[k] = (this.player.weapons[k] || 0) + 1;
+      const qualityName = { common:'普通', rare:'稀有', epic:'史诗', legendary:'金色传说' }[q] || q;
+      const color = { common:'#cbd5e1', rare:'#60a5fa', epic:'#c084fc', legendary:'#fbbf24' }[q] || '#fff';
+      this.addFloatingText(this.player.x, this.player.y - 42, `🎁 ${qualityName}奖励：${WEAPONS[k].name} Lv.${this.player.weapons[k]}`, color, q === 'legendary' ? 19 : 16);
+      sound.playUpgrade();
+    } else {
+      // 对应品质没有可升级武器时，退化成经验，不强行送更高品质。
+      const ratio = q === 'legendary' ? 0.75 : q === 'epic' ? 0.5 : q === 'rare' ? 0.32 : 0.22;
+      giveXp(ratio, 16);
+    }
+    ev.quality = this.rollMapRewardQuality();
   }
 
   drawOfficeMap(ctx, stageConf) {
@@ -369,18 +431,28 @@ export class GameEngine {
   }
 
   drawZoneEvents(ctx) {
+    const palette = {
+      junk: { glow:'#94a3b8', fill:'rgba(148,163,184,0.15)', icon:'📦' },
+      common: { glow:'#cbd5e1', fill:'rgba(203,213,225,0.16)', icon:'🎁' },
+      rare: { glow:'#60a5fa', fill:'rgba(96,165,250,0.18)', icon:'🎁' },
+      epic: { glow:'#c084fc', fill:'rgba(192,132,252,0.19)', icon:'🎁' },
+      legendary: { glow:'#fbbf24', fill:'rgba(251,191,36,0.22)', icon:'🏆' }
+    };
     for (const ev of this.zoneEvents) {
       if (!ev.active) continue;
-      const pulse = 1 + Math.sin(ev.pulse) * 0.08;
+      const style = palette[ev.quality] || palette.junk;
+      const pulse = 1 + Math.sin(ev.pulse) * 0.07;
       ctx.save();
       ctx.translate(ev.x, ev.y);
       ctx.scale(pulse, pulse);
-      ctx.shadowBlur = 18;
-      ctx.shadowColor = ev.type === 'weapon' ? '#fbbf24' : '#38bdf8';
-      ctx.fillStyle = ev.type === 'weapon' ? 'rgba(251,191,36,0.18)' : 'rgba(56,189,248,0.18)';
-      ctx.beginPath(); ctx.arc(0, 0, 24, 0, Math.PI * 2); ctx.fill();
-      ctx.font = '26px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(ev.type === 'weapon' ? '🗃️' : '📚', 0, 0);
+      ctx.shadowBlur = ev.quality === 'legendary' ? 24 : 12;
+      ctx.shadowColor = style.glow;
+      ctx.fillStyle = style.fill;
+      ctx.strokeStyle = style.glow;
+      ctx.lineWidth = ev.quality === 'legendary' ? 3 : 1.5;
+      ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.font = '25px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(style.icon, 0, 0);
       ctx.restore();
     }
   }
@@ -1047,6 +1119,23 @@ export class GameEngine {
     return `${m}:${s}`;
   }
 
+  stabilizePlayerPosition() {
+    const p = this.player;
+    if (!p) return;
+    const margin = Math.max(8, p.radius + 10);
+    const valid = Number.isFinite(p.x) && Number.isFinite(p.y);
+    if (!valid) {
+      p.x = Number.isFinite(this.lastSafePlayerX) ? this.lastSafePlayerX : this.mapWidth / 2;
+      p.y = Number.isFinite(this.lastSafePlayerY) ? this.lastSafePlayerY : this.mapHeight / 2;
+      p.vx = 0; p.vy = 0;
+      console.error('[camera-guard] invalid player position recovered');
+    }
+    p.x = Math.max(margin, Math.min(this.mapWidth - margin, p.x));
+    p.y = Math.max(margin, Math.min(this.mapHeight - margin, p.y));
+    this.lastSafePlayerX = p.x;
+    this.lastSafePlayerY = p.y;
+  }
+
   update(dt) {
     if (this.state !== 'PLAYING') return;
 
@@ -1083,6 +1172,9 @@ export class GameEngine {
 
     this.floatingTexts.forEach(ft => ft.update(dt));
     this.floatingTexts = this.floatingTexts.filter(ft => ft.life > 0);
+
+    // Boss/AOE/障碍物更新可能发生强制位移；统一在世界更新结束后做坐标保护，避免摄像机被异常坐标锁死。
+    this.stabilizePlayerPosition();
 
     // 碰撞检测：玩家子弹命中怪物
     this.projectiles.forEach(proj => {
@@ -1218,11 +1310,17 @@ export class GameEngine {
     ctx.save();
     ctx.clearRect(0, 0, this.viewWidth, this.viewHeight);
 
-    // 摄像机平移跟随玩家
+    // 摄像机只跟随经过坐标保护的玩家位置；Boss绝不接管摄像机。
     if (this.player) {
-      const cx = Math.max(0, Math.min(this.mapWidth - this.viewWidth, this.player.x - this.viewWidth / 2));
-      const cy = Math.max(0, Math.min(this.mapHeight - this.viewHeight, this.player.y - this.viewHeight / 2));
-      ctx.translate(-cx, -cy);
+      const maxCx = Math.max(0, this.mapWidth - this.viewWidth);
+      const maxCy = Math.max(0, this.mapHeight - this.viewHeight);
+      const targetX = Math.max(0, Math.min(maxCx, this.player.x - this.viewWidth / 2));
+      const targetY = Math.max(0, Math.min(maxCy, this.player.y - this.viewHeight / 2));
+      if (Number.isFinite(targetX) && Number.isFinite(targetY)) {
+        this.cameraX = targetX;
+        this.cameraY = targetY;
+      }
+      ctx.translate(-this.cameraX, -this.cameraY);
     }
 
     // 绘制办公室分区地图与随机事件

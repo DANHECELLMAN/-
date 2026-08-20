@@ -1,5 +1,5 @@
 /**
- * 《今天也不想上班》- 实体与战斗系统核心类库 (V1.8 地图事件与移动端横屏优化版)
+ * 《今天也不想上班》- 实体与战斗系统核心类库 (V1.9 地图事件与移动端横屏优化版)
  */
 
 import { M_TO_PX, CHARACTERS, PLAYER_BASE, PRESSURE_STAGES, WEAPONS, SKILLS, ARTIFACTS, NORMAL_ENEMIES, ELITES, UPGRADE_SYSTEM, STAGES_CONFIG } from './constants.js?v=1.8';
@@ -527,6 +527,11 @@ export class AOEZone {
   }
 
   update(dt, game) {
+    // Boss技能必须跟随Boss生命周期；Boss死亡后立刻销毁，避免隐形残留伤害。
+    if (this.owner && this.owner.isBoss && !this.owner.alive) {
+      this.alive = false;
+      return;
+    }
     if (this.followPlayer && game.player && game.player.alive) {
       this.x = game.player.x;
       this.y = game.player.y;
@@ -2198,22 +2203,17 @@ export class BaseBoss {
     }
   }
 
-  moveTowardPlayer(dt, player, speed) {
+  moveTowardPlayer(dt, player, speed, stopPadding = 52) {
     const dx = player.x - this.x;
     const dy = player.y - this.y;
-    let dist = Math.hypot(dx, dy);
-    const minDist = this.radius + player.radius + 2;
-    if (dist < 0.001) {
-      this.x -= minDist;
-      dist = minDist;
-    } else if (dist > minDist) {
-      const step = Math.min(speed * dt, dist - minDist);
+    const dist = Math.hypot(dx, dy);
+    // Boss不再主动“贴死”玩家。保持一个技能作战距离，避免出生后黏住玩家持续接触扣血。
+    const stopDist = this.radius + player.radius + stopPadding;
+    if (!Number.isFinite(dist) || dist < 0.001) return dist;
+    if (dist > stopDist) {
+      const step = Math.min(speed * dt, dist - stopDist);
       this.x += (dx / dist) * step;
       this.y += (dy / dist) * step;
-    } else if (dist < minDist - 1) {
-      const nx = dx / dist, ny = dy / dist;
-      this.x = player.x - nx * minDist;
-      this.y = player.y - ny * minDist;
     }
     return Math.hypot(player.x - this.x, player.y - this.y);
   }
@@ -2222,15 +2222,21 @@ export class BaseBoss {
     const dx = player.x - this.x;
     const dy = player.y - this.y;
     const dist = Math.hypot(dx, dy) || 1;
-    const minDist = this.radius + player.radius + 4;
-    if (dist <= minDist) {
-      const nx = dx / dist, ny = dy / dist;
-      player.x = this.x + nx * minDist;
-      player.y = this.y + ny * minDist;
+    // 只有真正实体重叠才算接触伤害；不再通过Boss逻辑强行改写玩家坐标。
+    const contactDist = Math.max(8, this.radius + player.radius - 4);
+    if (dist <= contactDist) {
       const now = Date.now();
-      if (now - this.lastContactDmgTime >= 700) {
+      if (now - this.lastContactDmgTime >= 1100) {
         this.lastContactDmgTime = now;
         player.takeDamage(this.damage, this, game);
+      }
+      // 轻微把Boss本体弹开，而不是把玩家推出地图/锁住摄像机。
+      const nx = dx / dist, ny = dy / dist;
+      this.x -= nx * 24;
+      this.y -= ny * 24;
+      if (game) {
+        this.x = Math.max(this.radius, Math.min(game.mapWidth - this.radius, this.x));
+        this.y = Math.max(this.radius, Math.min(game.mapHeight - this.radius, this.y));
       }
     }
   }

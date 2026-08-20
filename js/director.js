@@ -1,5 +1,5 @@
 /**
- * 《今天也不想上班》- 刷怪导演与模块化关卡系统 (V1.8 地图事件与移动端横屏优化版)
+ * 《今天也不想上班》- 刷怪导演与模块化关卡系统 (V1.9 地图事件与移动端横屏优化版)
  */
 
 import { STAGES_CONFIG, NORMAL_ENEMIES, ELITES, RANDOM_BOSS_ROSTER } from './constants.js?v=1.8';
@@ -226,10 +226,23 @@ export class WaveDirector {
     if (!p) return;
 
     const bossConf = this.stageConfig.boss;
-    const boss = createBossInstance(bossConf.type || bossConf.id, p.x, p.y - 250, bossConf);
+    // 在地图内、距离玩家足够远的位置生成Boss，避免贴脸出生和越界坐标引发摄像机/接触伤害异常。
+    const margin = Math.max(70, (bossConf.size || 38) + 24);
+    const desired = 360;
+    let best = { x: this.game.mapWidth / 2, y: this.game.mapHeight / 2, d: 0 };
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI * 2 / 8;
+      const x = Math.max(margin, Math.min(this.game.mapWidth - margin, p.x + Math.cos(a) * desired));
+      const y = Math.max(margin, Math.min(this.game.mapHeight - margin, p.y + Math.sin(a) * desired));
+      const d = Math.hypot(x - p.x, y - p.y);
+      if (d > best.d) best = { x, y, d };
+    }
+    const boss = createBossInstance(bossConf.type || bossConf.id, best.x, best.y, bossConf);
     this.game.enemies.push(boss);
     this.game.bossInstance = boss;
 
+    // Boss战开始时清理旧的敌方弹幕，保证伤害来源可读。
+    this.game.projectiles = this.game.projectiles.filter(pr => !pr.isEnemy);
     sound.playBossWarning();
     p.addPressure(10, this.game);
     this.game.addFloatingText(p.x, p.y - 50, `👹【${boss.name}】登场！今日拒绝加班！`, "#dc2626", 24);

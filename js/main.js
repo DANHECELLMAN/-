@@ -1,9 +1,9 @@
 /**
- * 《今天也不想上班》- 程序启动与全平台UI事件绑定 (V1.8 地图事件与移动端横屏优化版)
+ * 《今天也不想上班》- 程序启动与全平台UI事件绑定 (V1.9 Boss稳定/稀疏奖励/强敌与真横屏修复版)
  */
 
-import { GameEngine } from './game.js?v=1.8';
-import { sound } from './audio.js?v=1.8';
+import { GameEngine } from './game.js?v=1.9';
+import { sound } from './audio.js?v=1.9';
 
 window.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('game-canvas');
@@ -171,8 +171,14 @@ window.addEventListener('DOMContentLoaded', () => {
     landscapeBtn.onclick = async () => {
       sound.init();
       sound.playClick();
-      await game.requestLandscapeMode();
-      landscapeBtn.innerText = (window.innerWidth > window.innerHeight) ? '📱 已进入横屏' : '📱 请旋转手机横屏';
+      const result = await game.requestLandscapeMode();
+      if (result?.mode === 'css-rotated') {
+        landscapeBtn.innerText = '📱 强制横屏中（点此退出）';
+      } else if (result?.mode === 'native-landscape') {
+        landscapeBtn.innerText = '📱 系统横屏中';
+      } else {
+        landscapeBtn.innerText = '📱 横屏模式';
+      }
     };
   }
 
