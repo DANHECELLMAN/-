@@ -1,0 +1,29 @@
+{
+  "character_id": "horn_mecha",
+  "display_name": "角虎机甲",
+  "source_of_truth": "reference/character_reference.png",
+  "source_sha256": "55c35ff5b53e0f29297392a4d791fb67afa20f2884953686424c0fb282ebd97b",
+  "identity_rules": {
+    "must_preserve": [
+      "Q版机甲比例",
+      "紫色主装甲",
+      "绿色肩部/胸部点缀",
+      "单角头盔",
+      "黄色眼部",
+      "白色锯齿面甲",
+      "红色小型点缀"
+    ],
+    "may_expand": [
+      "背部结构",
+      "侧面机甲细节",
+      "动画姿态"
+    ],
+    "forbidden": [
+      "改成真人",
+      "改成其他主色",
+      "删除单角特征",
+      "改变Q版头身比例"
+    ]
+  },
+  "pipeline_version": "1.0"
+}

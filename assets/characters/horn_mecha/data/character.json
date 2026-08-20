@@ -1,0 +1,32 @@
+{
+  "id": "horn_mecha",
+  "name": "角虎机甲",
+  "title": "同步作战原型",
+  "avatar": "🤖",
+  "role": "高机动近中距离平衡战士",
+  "description": "基于用户上传原始角色图扩展出的可玩机甲角色。",
+  "base_stats": {
+    "maxHp": 108,
+    "moveSpeed": 4.25,
+    "damageMult": 1.12,
+    "critRate": 0.08,
+    "critDmg": 1.75,
+    "xpMult": 1.0,
+    "pickupRadius": 2.35
+  },
+  "passive": {
+    "name": "同步率提升",
+    "effect": "闪避后 1.5 秒攻击速度+20%；受击后 1.2 秒移速+8%。"
+  },
+  "active": {
+    "name": "角虎机动",
+    "cd": 15.0,
+    "duration": 0.9,
+    "effect": "冲刺并触发一次近身冲击波AOE。"
+  },
+  "integration": {
+    "game_engine": "HTML5 Canvas + JavaScript",
+    "project_version": "V1.5",
+    "playable": true
+  }
+}

@@ -1,0 +1,164 @@
+{
+  "idle": {
+    "sheet": "spritesheets/idle_8dir.png",
+    "sheet_size": {
+      "width": 1086,
+      "height": 1448
+    },
+    "rows": 8,
+    "cols": 6,
+    "fps": 6,
+    "loop": true,
+    "directions": [
+      "down",
+      "down_left",
+      "left",
+      "up_left",
+      "up",
+      "up_right",
+      "right",
+      "down_right"
+    ],
+    "frame_bounds_first": [
+      0,
+      0,
+      181,
+      181
+    ]
+  },
+  "run": {
+    "sheet": "spritesheets/run_8dir.png",
+    "sheet_size": {
+      "width": 1254,
+      "height": 1254
+    },
+    "rows": 8,
+    "cols": 8,
+    "fps": 10,
+    "loop": true,
+    "directions": [
+      "down",
+      "down_left",
+      "left",
+      "up_left",
+      "up",
+      "up_right",
+      "right",
+      "down_right"
+    ],
+    "frame_bounds_first": [
+      0,
+      0,
+      157,
+      157
+    ]
+  },
+  "attack": {
+    "sheet": "spritesheets/attack_8dir.png",
+    "sheet_size": {
+      "width": 1254,
+      "height": 1254
+    },
+    "rows": 8,
+    "cols": 8,
+    "fps": 14,
+    "loop": false,
+    "directions": [
+      "down",
+      "down_left",
+      "left",
+      "up_left",
+      "up",
+      "up_right",
+      "right",
+      "down_right"
+    ],
+    "frame_bounds_first": [
+      0,
+      0,
+      157,
+      157
+    ]
+  },
+  "dodge": {
+    "sheet": "spritesheets/dodge_8dir.png",
+    "sheet_size": {
+      "width": 1086,
+      "height": 1448
+    },
+    "rows": 8,
+    "cols": 6,
+    "fps": 18,
+    "loop": false,
+    "directions": [
+      "down",
+      "down_left",
+      "left",
+      "up_left",
+      "up",
+      "up_right",
+      "right",
+      "down_right"
+    ],
+    "frame_bounds_first": [
+      0,
+      0,
+      181,
+      181
+    ]
+  },
+  "hit": {
+    "sheet": "spritesheets/hit_8dir.png",
+    "sheet_size": {
+      "width": 887,
+      "height": 1774
+    },
+    "rows": 8,
+    "cols": 4,
+    "fps": 12,
+    "loop": false,
+    "directions": [
+      "down",
+      "down_left",
+      "left",
+      "up_left",
+      "up",
+      "up_right",
+      "right",
+      "down_right"
+    ],
+    "frame_bounds_first": [
+      0,
+      0,
+      222,
+      222
+    ]
+  },
+  "death": {
+    "sheet": "spritesheets/death_8dir.png",
+    "sheet_size": {
+      "width": 1402,
+      "height": 1122
+    },
+    "rows": 8,
+    "cols": 10,
+    "fps": 10,
+    "loop": false,
+    "directions": [
+      "down",
+      "down_left",
+      "left",
+      "up_left",
+      "up",
+      "up_right",
+      "right",
+      "down_right"
+    ],
+    "frame_bounds_first": [
+      0,
+      0,
+      140,
+      140
+    ]
+  }
+}
