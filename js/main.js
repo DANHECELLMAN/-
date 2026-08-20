@@ -1,220 +1,113 @@
-/**
- * 《今天也不想上班》- 程序启动与全平台UI事件绑定 (V1.9 Boss稳定/稀疏奖励/强敌与真横屏修复版)
- */
+// =========================================================
+// 游戏入口模块 (main.js)
+// =========================================================
 
-import { GameEngine } from './game.js?v=1.9';
-import { sound } from './audio.js?v=1.9';
+import { GameEngine } from './game.js';
+import { TouchController } from './touch-controls.js';
+import { sound } from './sound.js';
 
 window.addEventListener('DOMContentLoaded', () => {
-  const canvas = document.getElementById('game-canvas');
-  const game = new GameEngine(canvas);
+    const canvas = document.getElementById('game-canvas');
+    const touchLayer = document.getElementById('touch-layer');
 
-  // 开始游戏
-  document.getElementById('btn-start-game').onclick = () => {
-    game.startNewGame();
-  };
+    let selectedCharId = 'xiaochen';
 
-  // 角色选择弹窗与关闭/返回
-  const charModal = document.getElementById('character-modal');
-  document.getElementById('btn-open-characters').onclick = () => {
-    sound.init();
-    sound.playClick();
-    game.renderCharacterSelectModal();
-  };
-  const closeChar = () => {
-    sound.playClick();
-    charModal.style.display = 'none';
-  };
-  document.getElementById('btn-close-characters').onclick = closeChar;
-  document.getElementById('btn-back-characters').onclick = closeChar;
-  document.getElementById('btn-close-char-x').onclick = closeChar;
+    // 1. 初始化触控系统
+    let engine = null;
+    const touchController = new TouchController(
+        touchLayer,
+        (vector) => {
+            if (engine && engine.player) {
+                engine.player.setInput(vector.x, vector.y);
+            }
+        },
+        (skillType) => {
+            if (!engine || !engine.player) return;
+            if (skillType === 'dash') {
+                engine.player.triggerDash();
+            } else if (skillType === 'special') {
+                engine.player.triggerSpecial(engine.projectiles);
+            }
+        }
+    );
 
-  // 关卡选择弹窗与关闭/返回
-  const stageModal = document.getElementById('stage-modal');
-  document.getElementById('btn-open-stages').onclick = () => {
-    sound.init();
-    sound.playClick();
-    game.renderStageSelectModal();
-  };
-  const closeStage = () => {
-    sound.playClick();
-    stageModal.style.display = 'none';
-  };
-  document.getElementById('btn-close-stages').onclick = closeStage;
-  document.getElementById('btn-back-stages').onclick = closeStage;
-  document.getElementById('btn-close-stage-x').onclick = closeStage;
+    // 2. 实例化游戏引擎
+    engine = new GameEngine(canvas, touchController);
 
-  // 局外天赋弹窗与关闭
-  const talentModal = document.getElementById('talent-modal');
-  document.getElementById('btn-open-talents').onclick = () => {
-    sound.init();
-    sound.playClick();
-    game.renderTalentsModal();
-  };
-  const closeTalent = () => {
-    sound.playClick();
-    talentModal.style.display = 'none';
-  };
-  document.getElementById('btn-close-talents').onclick = closeTalent;
-  document.getElementById('btn-close-talent-x').onclick = closeTalent;
+    // 3. 角色选择事件
+    const charCards = document.querySelectorAll('.char-card');
+    charCards.forEach((card) => {
+        card.addEventListener('pointerdown', () => {
+            charCards.forEach((c) => c.classList.remove('selected'));
+            card.classList.add('selected');
+            selectedCharId = card.dataset.char;
+            sound.init();
+        });
+    });
 
-  // 玩法指南弹窗与关闭
-  const guideModal = document.getElementById('guide-modal');
-  document.getElementById('btn-open-guide').onclick = () => {
-    sound.init();
-    sound.playClick();
-    guideModal.style.display = 'flex';
-  };
-  const closeGuide = () => {
-    sound.playClick();
-    guideModal.style.display = 'none';
-  };
-  document.getElementById('btn-close-guide').onclick = closeGuide;
-  document.getElementById('btn-close-guide-x').onclick = closeGuide;
+    // 4. 按钮事件绑定
+    document.getElementById('btn-start').addEventListener('pointerdown', () => {
+        engine.startNewGame(selectedCharId);
+    });
 
-  // 设置菜单弹窗与关闭
-  const settingsModal = document.getElementById('settings-menu-modal');
-  document.getElementById('btn-open-settings').onclick = () => {
-    sound.init();
-    sound.playClick();
-    settingsModal.style.display = 'flex';
-  };
-  const closeSettings = () => {
-    sound.playClick();
-    settingsModal.style.display = 'none';
-  };
-  document.getElementById('btn-close-settings').onclick = closeSettings;
-  document.getElementById('btn-close-settings-x').onclick = closeSettings;
+    document.getElementById('btn-pause').addEventListener('pointerdown', () => {
+        engine.pauseGame();
+    });
 
-  document.getElementById('btn-pause-from-settings').onclick = () => {
-    settingsModal.style.display = 'none';
-    game.pauseGame();
-  };
+    document.getElementById('btn-resume').addEventListener('pointerdown', () => {
+        engine.resumeGame();
+    });
 
-  // 刷新升级选项
-  document.getElementById('levelup-reroll-btn').onclick = () => {
-    game.rerollLevelUpChoices();
-  };
-
-  // 暂停与继续
-  document.getElementById('btn-resume-game').onclick = () => {
-    sound.playClick();
-    game.resumeGame();
-  };
-  document.getElementById('btn-quit-game').onclick = () => {
-    sound.playClick();
-    game.hideAllModals();
-    game.state = 'MENU';
-    document.getElementById('hud').style.display = 'none';
-    document.getElementById('mobile-controls').style.display = 'none';
-    document.getElementById('main-menu').style.display = 'flex';
-    sound.stopBgm();
-  };
-
-  // 结算重试与返回
-  document.getElementById('btn-restart-gameover').onclick = () => {
-    game.startNewGame();
-  };
-  document.getElementById('btn-menu-gameover').onclick = () => {
-    document.getElementById('btn-quit-game').click();
-  };
-  document.getElementById('btn-restart-victory').onclick = () => {
-    game.startNewGame();
-  };
-  document.getElementById('btn-menu-victory').onclick = () => {
-    document.getElementById('btn-quit-game').click();
-  };
-
-  // 手机端动作按键
-  const dodgeBtn = document.getElementById('btn-dodge');
-  if (dodgeBtn) {
-    dodgeBtn.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (game.player && game.state === "PLAYING") game.player.performDodge(game);
-    }, { passive: false });
-
-    dodgeBtn.onclick = (e) => {
-      e.preventDefault();
-      if (game.player && game.state === "PLAYING") game.player.performDodge(game);
+    const restartHandler = () => {
+        engine.startNewGame(selectedCharId);
     };
-  }
 
-  const skillBtn = document.getElementById('btn-skill');
-  if (skillBtn) {
-    skillBtn.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (game.player && game.state === "PLAYING") game.player.performActiveSkill(game);
-    }, { passive: false });
+    document.getElementById('btn-restart').addEventListener('pointerdown', restartHandler);
+    document.getElementById('btn-restart-pause').addEventListener('pointerdown', restartHandler);
 
-    skillBtn.onclick = (e) => {
-      e.preventDefault();
-      if (game.player && game.state === "PLAYING") game.player.performActiveSkill(game);
-    };
-  }
+    const btnSound = document.getElementById('btn-sound-toggle');
+    btnSound.addEventListener('pointerdown', () => {
+        const isMuted = sound.toggleMute();
+        btnSound.innerText = isMuted ? '🔇' : '🔊';
+    });
 
-  // 设置弹窗内功能按钮
-  const controlsBtn = document.getElementById('btn-toggle-controls');
-  if (controlsBtn) {
-    controlsBtn.onclick = () => {
-      sound.init();
-      sound.playClick();
-      game.showMobileControls = !game.showMobileControls;
-      document.getElementById('mobile-controls').style.display = (game.showMobileControls && game.state === 'PLAYING') ? 'block' : 'none';
-      controlsBtn.innerText = game.showMobileControls ? '🎮 虚拟摇杆: 开' : '🎮 虚拟摇杆: 关';
-    };
-  }
+    // 5. 键盘操作监听 (PC 端兼容)
+    const activeKeys = {};
+    window.addEventListener('keydown', (e) => {
+        const key = e.key.toLowerCase();
+        activeKeys[key] = true;
+        updatePCInput();
 
-  const landscapeBtn = document.getElementById('btn-landscape-mode');
-  if (landscapeBtn) {
-    landscapeBtn.onclick = async () => {
-      sound.init();
-      sound.playClick();
-      const result = await game.requestLandscapeMode();
-      if (result?.mode === 'css-rotated') {
-        landscapeBtn.innerText = '📱 强制横屏中（点此退出）';
-      } else if (result?.mode === 'native-landscape') {
-        landscapeBtn.innerText = '📱 系统横屏中';
-      } else {
-        landscapeBtn.innerText = '📱 横屏模式';
-      }
-    };
-  }
+        if (key === ' ' || key === 'j') {
+            if (engine && engine.player) engine.player.triggerDash();
+        }
+        if (key === 'k') {
+            if (engine && engine.player) engine.player.triggerSpecial(engine.projectiles);
+        }
+        if (key === 'escape') {
+            if (engine.state === 'PLAYING') engine.pauseGame();
+            else if (engine.state === 'PAUSED') engine.resumeGame();
+        }
+    });
 
-  const soundBtn = document.getElementById('btn-toggle-sound');
-  if (soundBtn) {
-    soundBtn.onclick = () => {
-      sound.init();
-      const muted = sound.toggleMute();
-      soundBtn.innerText = muted ? '🔇 音效: 关' : '🔊 音效: 开';
-    };
-  }
+    window.addEventListener('keyup', (e) => {
+        const key = e.key.toLowerCase();
+        activeKeys[key] = false;
+        updatePCInput();
+    });
 
-  const speedBtn = document.getElementById('btn-toggle-speed');
-  if (speedBtn) {
-    speedBtn.onclick = () => {
-      sound.init();
-      if (game.timeScale === 1.0) {
-        game.timeScale = 3.0;
-        speedBtn.innerText = '⚡ 游戏速度: 3x';
-      } else {
-        game.timeScale = 1.0;
-        speedBtn.innerText = '⏱️ 游戏速度: 1x';
-      }
-    };
-  }
+    function updatePCInput() {
+        if (!engine || !engine.player) return;
+        let vx = 0;
+        let vy = 0;
+        if (activeKeys['w'] || activeKeys['arrowup']) vy -= 1;
+        if (activeKeys['s'] || activeKeys['arrowdown']) vy += 1;
+        if (activeKeys['a'] || activeKeys['arrowleft']) vx -= 1;
+        if (activeKeys['d'] || activeKeys['arrowright']) vx += 1;
 
-  const bossTestBtn = document.getElementById('btn-test-boss');
-  if (bossTestBtn) {
-    bossTestBtn.onclick = () => {
-      if (game.state === 'PLAYING') {
-        settingsModal.style.display = 'none';
-        game.director.gameTime = game.director.stageConfig.duration;
-        game.director.spawnBoss();
-      }
-    };
-  }
-
-  requestAnimationFrame((t) => game.loop(t));
+        // 如果没有触控摇杆输入，则应用键盘输入
+        if (touchController.joystickPointerId === null) {
+            engine.player.setInput(vx, vy);
+        }
+    }
 });
