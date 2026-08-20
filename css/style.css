@@ -932,3 +932,83 @@ body, html {
   .action-buttons { right: max(14px, env(safe-area-inset-right)); bottom: max(24px, env(safe-area-inset-bottom)); }
   #joystick-base { left: max(22px, env(safe-area-inset-left)); bottom: max(26px, env(safe-area-inset-bottom)); }
 }
+
+
+/* V1.9：真正的手机横屏回退模式。
+   当浏览器不支持 Screen Orientation Lock（典型如 iOS Safari）时，旋转整个游戏容器，
+   并把画布逻辑尺寸交换为横屏尺寸。 */
+@media (orientation: portrait) {
+  body.force-landscape {
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    background: #020617;
+  }
+
+  body.force-landscape #game-container {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    width: 100vh;
+    width: 100dvh;
+    height: 100vw;
+    transform: translate(-50%, -50%) rotate(90deg);
+    transform-origin: center center;
+    overflow: hidden;
+  }
+
+  body.force-landscape #game-canvas {
+    width: 100%;
+    height: 100%;
+  }
+
+  body.force-landscape #joystick-zone {
+    width: 44%;
+    height: 100%;
+  }
+
+  body.force-landscape #joystick-base {
+    width: 104px;
+    height: 104px;
+    left: max(22px, env(safe-area-inset-left));
+    bottom: max(16px, env(safe-area-inset-bottom));
+  }
+
+  body.force-landscape #joystick-nub {
+    width: 44px;
+    height: 44px;
+    margin-left: -22px;
+    margin-top: -22px;
+  }
+
+  body.force-landscape .action-buttons {
+    right: max(22px, env(safe-area-inset-right));
+    bottom: max(16px, env(safe-area-inset-bottom));
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 12px;
+  }
+
+  body.force-landscape .action-btn {
+    width: 64px;
+    height: 64px;
+    font-size: 10px;
+  }
+
+  body.force-landscape .hud-top-bar {
+    transform: scale(0.86);
+    transform-origin: top left;
+    width: 116%;
+  }
+
+  body.force-landscape .hud-bottom-center {
+    bottom: 8px;
+    transform: translateX(-50%) scale(0.88);
+  }
+
+  body.force-landscape .modal-content {
+    max-height: 88%;
+    overflow-y: auto;
+  }
+}
