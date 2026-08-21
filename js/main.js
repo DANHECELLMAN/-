@@ -2,8 +2,8 @@
  * 《今天也不想上班》- 程序启动与全平台UI事件绑定 (V1.9 Boss稳定/稀疏奖励/强敌与真横屏修复版)
  */
 
-import { GameEngine } from './game.js?v=2.0';
-import { sound } from './audio.js?v=2.0';
+import { GameEngine } from './game.js?v=2.1';
+import { sound } from './audio.js?v=2.1';
 
 window.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('game-canvas');

@@ -2,8 +2,8 @@
  * 《今天也不想上班》- 实体与战斗系统核心类库 (V1.9 地图事件与移动端横屏优化版)
  */
 
-import { M_TO_PX, CHARACTERS, PLAYER_BASE, PRESSURE_STAGES, WEAPONS, SKILLS, ARTIFACTS, NORMAL_ENEMIES, ELITES, UPGRADE_SYSTEM, STAGES_CONFIG } from './constants.js?v=2.0';
-import { sound } from './audio.js?v=2.0';
+import { M_TO_PX, CHARACTERS, PLAYER_BASE, PRESSURE_STAGES, WEAPONS, SKILLS, ARTIFACTS, NORMAL_ENEMIES, ELITES, UPGRADE_SYSTEM, STAGES_CONFIG } from './constants.js?v=2.1';
+import { sound } from './audio.js?v=2.1';
 
 // 伤害飘字类
 export class DamageNumber {
@@ -229,9 +229,14 @@ export class Projectile {
     this.knockback = options.knockback || false;
     this.rotation = Math.random() * Math.PI * 2;
     this.tracking = options.tracking || false;
+    this.owner = options.owner || null;
   }
 
   update(dt, game) {
+    if (this.owner && this.owner.isBoss && !this.owner.alive) {
+      this.alive = false;
+      return;
+    }
     this.life -= dt;
     this.rotation += dt * 8;
 
@@ -1097,6 +1102,13 @@ export class Player {
     this.damageMoveBuffTimer = 0;
     this.dodgeAttackBuffTimer = 0;
     this.isMoving = false;
+
+    // 压力崩溃必须是可恢复的有限状态，不能在 100 压力后永久自损。
+    this.collapseTimer = 0;
+    this.collapseTickTimer = 0;
+    this.collapseRecoveryTimer = 0;
+    this.lastDamageSource = "";
+
     if (this.characterId === "horn_mecha") {
       Object.values(HORN_MECHA_ANIMS).forEach(meta => getHornMechaImage(meta.src));
     }
@@ -1211,20 +1223,54 @@ export class Player {
   }
 
   updatePressure(dt, game) {
-    if (this.pressure >= 80 && this.pressure < 100) {
+    if (this.collapseRecoveryTimer > 0) {
+      this.collapseRecoveryTimer = Math.max(0, this.collapseRecoveryTimer - dt);
+    }
+
+    // 崩溃仍然保留原来的每秒 2% 最大生命损失，但只持续 3 秒。
+    // 原版本在 pressure === 100 时永远无法进入衰减分支，造成必死的无限扣血死锁。
+    if (this.isCollapsed) {
+      this.collapseTimer -= dt;
+      this.collapseTickTimer += dt;
+
+      while (this.collapseTickTimer >= 1.0) {
+        this.collapseTickTimer -= 1.0;
+        const collapseDamage = this.maxHp * 0.02;
+        this.hp -= collapseDamage;
+        sound.playHeartbeat();
+        game.addDamageNumber(this.x, this.y, collapseDamage, false, true, "💢");
+        if (this.hp <= 0) {
+          this.die(game);
+          return;
+        }
+      }
+
+      if (this.collapseTimer <= 0) {
+        this.isCollapsed = false;
+        this.pressure = Math.min(this.pressure, 72);
+        this.collapseRecoveryTimer = 2.5;
+        this.lastHurtTime = Date.now();
+        game.addFloatingText(this.x, this.y - 38, "🫁 缓过来了…", "#38bdf8", 14);
+      }
+      return;
+    }
+
+    if (this.pressure >= 100) {
+      this.pressure = 100;
+      this.isCollapsed = true;
+      this.collapseTimer = 3.0;
+      this.collapseTickTimer = 0;
+      game.addFloatingText(this.x, this.y - 42, "💥 压力崩溃！", "#ef4444", 18);
+      return;
+    }
+
+    if (this.pressure >= 80 && this.collapseRecoveryTimer <= 0) {
       this.addPressure(0.5 * dt, game);
     }
-    if (this.pressure >= 100) {
-      this.isCollapsed = true;
-      this.hp -= (this.maxHp * 0.02) * dt;
-      sound.playHeartbeat();
-      if (this.hp <= 0) this.die(game);
-    } else {
-      this.isCollapsed = false;
-      if (Date.now() - this.lastHurtTime > 4000 && this.pressure > 0) {
-        const decayRate = 3.5 * (1 + this.stressResistance);
-        this.reducePressure(decayRate * dt, game);
-      }
+
+    if (Date.now() - this.lastHurtTime > 4000 && this.pressure > 0) {
+      const decayRate = 3.5 * (1 + this.stressResistance);
+      this.reducePressure(decayRate * dt, game);
     }
   }
 
@@ -1808,6 +1854,7 @@ export class Player {
     }
 
     this.hp -= actualDamage;
+    this.lastDamageSource = sourceEnemy?.name || (isBossSkill ? "Boss技能" : "普通伤害");
     this.invulnerableTimer = PLAYER_BASE.hurtInvulnTime;
     this.lastHurtTime = Date.now();
     sound.playHurt();
@@ -2444,7 +2491,7 @@ export class DemandingClientBoss extends BaseBoss {
         game.projectiles.push(new Projectile({
           x: this.x, y: this.y,
           vx: Math.cos(angle) * 180, vy: Math.sin(angle) * 180,
-          damage: this.damage * 0.75, radius: 8, isEnemy: true, type: "client_stamp_bullet"
+          damage: this.damage * 0.75, radius: 8, isEnemy: true, type: "client_stamp_bullet", owner: this
         }));
       }
     }
@@ -2509,7 +2556,7 @@ export class HarassmentCallBoss extends BaseBoss {
             game.projectiles.push(new Projectile({
               x: this.x, y: this.y,
               vx: Math.cos(angle) * 260, vy: Math.sin(angle) * 260,
-              damage: this.damage * 0.7, radius: 8, isEnemy: true, tracking: true, type: "call_bullet"
+              damage: this.damage * 0.7, radius: 8, isEnemy: true, tracking: true, type: "call_bullet", owner: this
             }));
           }
         }, wave * 160);
@@ -2544,7 +2591,7 @@ export class ProjectDirectorBoss extends BaseBoss {
         game.addFloatingText(this.x, this.y - 30, "📑 连环方案飞页！", "#6366f1", 16);
         for (let i = -2; i <= 2; i++) {
           const base = Math.atan2(player.y - this.y, player.x - this.x) + i * 0.16;
-          game.projectiles.push(new Projectile({ x:this.x, y:this.y, vx:Math.cos(base)*235, vy:Math.sin(base)*235, damage:this.damage*0.65, radius:8, isEnemy:true, type:"client_stamp_bullet" }));
+          game.projectiles.push(new Projectile({ x:this.x, y:this.y, vx:Math.cos(base)*235, vy:Math.sin(base)*235, damage:this.damage*0.65, radius:8, isEnemy:true, type:"client_stamp_bullet", owner:this }));
         }
       }
     }
@@ -2570,7 +2617,7 @@ export class CeoBoss extends BaseBoss {
         const count = this.currentPhase === 3 ? 14 : 10;
         for (let i = 0; i < count; i++) {
           const a = i * Math.PI * 2 / count;
-          game.projectiles.push(new Projectile({ x:this.x, y:this.y, vx:Math.cos(a)*210, vy:Math.sin(a)*210, damage:this.damage*0.62, radius:8, isEnemy:true, type:"call_bullet" }));
+          game.projectiles.push(new Projectile({ x:this.x, y:this.y, vx:Math.cos(a)*210, vy:Math.sin(a)*210, damage:this.damage*0.62, radius:8, isEnemy:true, type:"call_bullet", owner:this }));
         }
       }
     }

@@ -2,10 +2,10 @@
  * 《今天也不想上班》- 核心游戏引擎与状态机 (V1.9 Boss稳定/稀疏奖励/强敌与真横屏修复版)
  */
 
-import { M_TO_PX, CHARACTERS, PLAYER_BASE, PRESSURE_STAGES, WEAPONS, SKILLS, ARTIFACTS, UPGRADE_SYSTEM, TALENTS, STAGES_CONFIG } from './constants.js?v=2.0';
-import { Player, DamageNumber, FloatingText, Particle, DropItem, Projectile, AOEZone, TerrainObstacle, createBossInstance } from './entities.js?v=2.0';
-import { WaveDirector } from './director.js?v=2.0';
-import { sound } from './audio.js?v=2.0';
+import { M_TO_PX, CHARACTERS, PLAYER_BASE, PRESSURE_STAGES, WEAPONS, SKILLS, ARTIFACTS, UPGRADE_SYSTEM, TALENTS, STAGES_CONFIG } from './constants.js?v=2.1';
+import { Player, DamageNumber, FloatingText, Particle, DropItem, Projectile, AOEZone, TerrainObstacle, createBossInstance } from './entities.js?v=2.1';
+import { WaveDirector } from './director.js?v=2.1';
+import { sound } from './audio.js?v=2.1';
 
 export class GameEngine {
   constructor(canvas) {
@@ -36,7 +36,7 @@ export class GameEngine {
     this.slowMoScale = 1.0;
 
     this.keys = {};
-    this.joystick = { x: 0, y: 0, active: false, id: null };
+    this.joystick = { x: 0, y: 0, active: false, id: null, originX: 0, originY: 0 };
     this.kills = 0;
     this.gameStartTime = 0;
     this.showMobileControls = true;
@@ -174,53 +174,95 @@ export class GameEngine {
       this.keys[e.code] = false;
     });
 
-    // 触控虚拟摇杆：统一使用 Pointer Events，横竖屏都直接按真实屏幕坐标计算。
+    // 浮动摇杆：左半屏任意落指位置就是摇杆中心，松手后隐藏。
+    // 不再要求玩家先把拇指移动到固定左下角，横屏时更符合动作手游操作习惯。
     const joyZone = document.getElementById('joystick-zone');
     const joyBase = document.getElementById('joystick-base');
     const joyNub = document.getElementById('joystick-nub');
     if (joyZone && joyBase && joyNub) {
-      const updatePointer = (clientX, clientY) => {
-        const rect = joyBase.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-        const dx = clientX - centerX;
-        const dy = clientY - centerY;
-        const dist = Math.hypot(dx, dy);
-        const maxR = Math.max(20, Math.min(rect.width, rect.height) / 2 - 12);
-        if (dist > 0.5) {
-          const nx = dx / dist;
-          const ny = dy / dist;
-          const clampedDist = Math.min(dist, maxR);
-          this.joystick.x = nx * (clampedDist / maxR);
-          this.joystick.y = ny * (clampedDist / maxR);
-          joyNub.style.transform = `translate(${nx * clampedDist}px, ${ny * clampedDist}px)`;
-        }
+      const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+      const setJoystickOrigin = (clientX, clientY) => {
+        const zoneRect = joyZone.getBoundingClientRect();
+        const baseRect = joyBase.getBoundingClientRect();
+        const size = Math.max(92, baseRect.width || 112);
+        const half = size / 2;
+        const sideGuard = 8;
+        const topGuard = Math.min(82, zoneRect.height * 0.22);
+        const bottomGuard = 10;
+
+        const localX = clamp(clientX - zoneRect.left, half + sideGuard, zoneRect.width - half - sideGuard);
+        const localY = clamp(clientY - zoneRect.top, half + topGuard, zoneRect.height - half - bottomGuard);
+
+        joyBase.style.left = `${localX - half}px`;
+        joyBase.style.top = `${localY - half}px`;
+        joyBase.style.right = 'auto';
+        joyBase.style.bottom = 'auto';
+        joyBase.classList.add('floating-active');
+
+        this.joystick.originX = zoneRect.left + localX;
+        this.joystick.originY = zoneRect.top + localY;
+        this.joystick.x = 0;
+        this.joystick.y = 0;
+        joyNub.style.transform = 'translate(0px, 0px)';
       };
+
+      const updatePointer = (clientX, clientY) => {
+        const dx = clientX - this.joystick.originX;
+        const dy = clientY - this.joystick.originY;
+        const dist = Math.hypot(dx, dy);
+        const baseRect = joyBase.getBoundingClientRect();
+        const maxR = Math.max(28, Math.min(baseRect.width, baseRect.height) * 0.34);
+
+        if (dist < 3) {
+          this.joystick.x = 0;
+          this.joystick.y = 0;
+          joyNub.style.transform = 'translate(0px, 0px)';
+          return;
+        }
+
+        const nx = dx / dist;
+        const ny = dy / dist;
+        const clampedDist = Math.min(dist, maxR);
+        const strength = clampedDist / maxR;
+        this.joystick.x = nx * strength;
+        this.joystick.y = ny * strength;
+        joyNub.style.transform = `translate(${nx * clampedDist}px, ${ny * clampedDist}px)`;
+      };
+
       joyZone.addEventListener('pointerdown', (e) => {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
+        if (this.joystick.active) return;
         e.preventDefault();
         this.joystick.active = true;
         this.joystick.id = e.pointerId;
         joyZone.setPointerCapture?.(e.pointerId);
-        updatePointer(e.clientX, e.clientY);
+        setJoystickOrigin(e.clientX, e.clientY);
       });
+
       joyZone.addEventListener('pointermove', (e) => {
         if (!this.joystick.active || this.joystick.id !== e.pointerId) return;
         e.preventDefault();
         updatePointer(e.clientX, e.clientY);
       });
+
       const resetJoy = (e) => {
         if (this.joystick.id !== null && e?.pointerId !== undefined && e.pointerId !== this.joystick.id) return;
         this.joystick.active = false;
         this.joystick.id = null;
         this.joystick.x = 0;
         this.joystick.y = 0;
+        this.joystick.originX = 0;
+        this.joystick.originY = 0;
         joyNub.style.transform = 'translate(0px, 0px)';
+        joyBase.classList.remove('floating-active');
       };
+
       joyZone.addEventListener('pointerup', resetJoy);
       joyZone.addEventListener('pointercancel', resetJoy);
       joyZone.addEventListener('lostpointercapture', resetJoy);
     }
+
   }
 
   startNewGame() {
@@ -1254,7 +1296,7 @@ export class GameEngine {
       if (!proj.alive || !proj.isEnemy) return;
       if (Math.hypot(this.player.x - proj.x, this.player.y - proj.y) <= this.player.radius + proj.radius) {
         proj.alive = false;
-        this.player.takeDamage(proj.damage, null, this, true);
+        this.player.takeDamage(proj.damage, proj.owner || null, this, true);
       }
     });
 

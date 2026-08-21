@@ -2,9 +2,9 @@
  * 《今天也不想上班》- 刷怪导演与模块化关卡系统 (V1.9 地图事件与移动端横屏优化版)
  */
 
-import { STAGES_CONFIG, NORMAL_ENEMIES, ELITES, RANDOM_BOSS_ROSTER } from './constants.js?v=2.0';
-import { Enemy, Elite, createBossInstance } from './entities.js?v=2.0';
-import { sound } from './audio.js?v=2.0';
+import { STAGES_CONFIG, NORMAL_ENEMIES, ELITES, RANDOM_BOSS_ROSTER } from './constants.js?v=2.1';
+import { Enemy, Elite, createBossInstance } from './entities.js?v=2.1';
+import { sound } from './audio.js?v=2.1';
 
 export class WaveDirector {
   constructor(game) {
