@@ -1,274 +1,757 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>今天也不想上班 - 动作肉鸽战斗系统 V2.0</title>
-  <link rel="stylesheet" href="css/style.css?v=2.1">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>BOUNDARY // 空间测试</title>
+  <meta name="description" content="一个基于建筑边界与空间记忆的房间迷宫小游戏原型。">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%23090d10'/%3E%3Cpath d='M13 12h38v40H13zM25 12v12h14V12M13 36h12v16M39 36h12v16' fill='none' stroke='%23e7f4ed' stroke-width='5'/%3E%3Ccircle cx='34' cy='38' r='3' fill='%23ff4f4f'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #e7f4ed;
+      --muted: #85958e;
+      --dark: #090d10;
+      --panel: #10171a;
+      --panel-2: #151e21;
+      --line: #304139;
+      --acid: #b8ff43;
+      --cyan: #61e8d4;
+      --danger: #ff4f4f;
+      --warning: #ffc857;
+      --shadow: rgba(0,0,0,.45);
+      --room-light: #25302c;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      min-height: 100svh;
+      color: var(--ink);
+      background:
+        linear-gradient(rgba(184,255,67,.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(184,255,67,.025) 1px, transparent 1px),
+        radial-gradient(circle at 45% -20%, #18302c 0, transparent 46%),
+        var(--dark);
+      background-size: 36px 36px, 36px 36px, auto, auto;
+      font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", "Microsoft YaHei", monospace;
+      overflow-x: hidden;
+    }
+
+    button { font: inherit; }
+    button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 3px; }
+
+    .shell {
+      width: min(1420px, 100%);
+      min-height: 100vh;
+      min-height: 100svh;
+      margin: 0 auto;
+      padding: 18px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 14px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      min-height: 54px;
+      border-bottom: 1px solid var(--line);
+      letter-spacing: .08em;
+    }
+
+    .brand { font-weight: 800; font-size: clamp(1rem, 2.5vw, 1.35rem); }
+    .brand i { color: var(--acid); font-style: normal; }
+    .run-id { justify-self: end; color: var(--muted); font-size: .86rem; }
+
+    .timer-wrap {
+      width: clamp(150px, 25vw, 300px);
+      text-align: center;
+    }
+    .timer {
+      color: var(--acid);
+      font-size: clamp(1.7rem, 4vw, 2.8rem);
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 0 20px rgba(184,255,67,.15);
+    }
+    .timer.danger { color: var(--danger); animation: pulse .55s step-end infinite; }
+    .timer-bar { height: 3px; margin-top: 8px; background: #233029; }
+    .timer-fill { height: 100%; width: 100%; background: var(--acid); transform-origin: left; }
+
+    .game-grid {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 330px;
+      gap: 14px;
+    }
+
+    .scene, .sidebar {
+      border: 1px solid var(--line);
+      background: rgba(11,16,18,.93);
+      box-shadow: 0 20px 70px var(--shadow);
+    }
+
+    .scene {
+      position: relative;
+      min-height: 590px;
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+    }
+
+    .scene::before {
+      content: "";
+      pointer-events: none;
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(255,255,255,.012) 3px 4px);
+      z-index: 8;
+    }
+
+    .room-meta {
+      z-index: 2;
+      padding: 18px 20px;
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      color: var(--muted);
+      border-bottom: 1px solid rgba(48,65,57,.55);
+      font-size: .88rem;
+    }
+    .room-meta strong { color: var(--ink); font-size: 1rem; }
+    .coord { color: var(--cyan); }
+
+    .room-view {
+      position: relative;
+      min-height: 390px;
+      display: grid;
+      place-items: end center;
+      perspective: 900px;
+      overflow: hidden;
+      background:
+        linear-gradient(115deg, transparent 0 48%, rgba(97,232,212,.055) 49%, transparent 51%),
+        linear-gradient(#17201e 0 68%, #101613 68%);
+    }
+
+    .room-view::before, .room-view::after {
+      content: "";
+      position: absolute;
+      top: 0; bottom: 32%;
+      width: 43%;
+      background: #111816;
+      border-color: #27332e;
+    }
+    .room-view::before { left: -26%; transform: skewY(25deg); border-right: 2px solid #27332e; }
+    .room-view::after { right: -26%; transform: skewY(-25deg); border-left: 2px solid #27332e; }
+
+    .ceiling-light {
+      position: absolute;
+      top: 8%; left: 50%;
+      width: 34%; height: 7px;
+      transform: translateX(-50%);
+      background: #cfe4da;
+      box-shadow: 0 0 35px 14px rgba(215,255,237,.12);
+      opacity: .72;
+    }
+
+    .floor-lines {
+      position: absolute;
+      inset: 68% -10% 0;
+      background:
+        linear-gradient(90deg, transparent 49.8%, #26332c 50%, transparent 50.2%),
+        repeating-linear-gradient(90deg, transparent 0 12.4%, #1e2924 12.5%),
+        repeating-linear-gradient(0deg, transparent 0 23%, #1e2924 24%);
+      transform: perspective(320px) rotateX(52deg) scale(1.2);
+      transform-origin: bottom;
+    }
+
+    .doors {
+      width: min(760px, 88%);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(24px, 7vw, 100px);
+      align-items: end;
+      padding-bottom: 42px;
+      z-index: 3;
+    }
+
+    .door {
+      position: relative;
+      height: clamp(225px, 36vh, 340px);
+      padding: 0;
+      color: var(--ink);
+      cursor: pointer;
+      border: 7px solid #34423b;
+      border-bottom-width: 10px;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.025), transparent 12% 88%, rgba(0,0,0,.18)),
+        #1c2723;
+      box-shadow: inset 0 0 0 1px #111915, 0 24px 30px rgba(0,0,0,.32);
+      transition: transform .12s, border-color .12s, filter .12s;
+      transform-origin: bottom;
+    }
+    .door:hover { transform: scale(1.018); border-color: var(--cyan); filter: brightness(1.13); }
+    .door:active { transform: scale(.99); }
+    .door::before {
+      content: "";
+      position: absolute;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--warning);
+      right: 17px; top: 53%;
+      box-shadow: 0 0 8px rgba(255,200,87,.45);
+    }
+    .door-key {
+      position: absolute;
+      left: 14px; top: 13px;
+      width: 29px; height: 29px;
+      display: grid; place-items: center;
+      border: 1px solid var(--muted);
+      color: var(--muted);
+      font-size: .8rem;
+    }
+    .door-direction {
+      display: block;
+      font-size: clamp(2.2rem, 6vw, 4.2rem);
+      font-weight: 900;
+      letter-spacing: -.05em;
+    }
+    .door-name { display: block; margin-top: 8px; color: var(--muted); font-size: .92rem; letter-spacing: .18em; }
+
+    .prompt {
+      z-index: 3;
+      min-height: 92px;
+      padding: 17px 20px 18px;
+      border-top: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 20px;
+      align-items: center;
+      background: #0d1315;
+    }
+    .prompt-main { font-size: 1rem; line-height: 1.55; }
+    .prompt-sub { color: var(--muted); margin-top: 5px; font-size: .82rem; }
+    .scan-chip { color: var(--cyan); border: 1px solid #28584f; padding: 9px 11px; white-space: nowrap; font-size: .78rem; }
+
+    .sidebar {
+      padding: 17px;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 15px;
+    }
+    .side-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .side-head h2 { margin: 0; font-size: 1rem; letter-spacing: .12em; }
+    .live-mark { color: var(--acid); font-size: .75rem; }
+    .live-mark::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: currentColor; }
+
+    .map-frame { border: 1px solid var(--line); background: #080c0e; padding: 8px; }
+    #map { display: block; width: 100%; height: auto; aspect-ratio: 5 / 4; }
+    .map-legend { display: flex; flex-wrap: wrap; gap: 10px 14px; color: var(--muted); font-size: .7rem; margin-top: 9px; }
+    .legend-swatch { display: inline-block; width: 9px; height: 9px; margin-right: 5px; vertical-align: -1px; }
+
+    .notes { min-height: 0; border-top: 1px solid var(--line); padding-top: 14px; }
+    .notes h3 { margin: 0 0 11px; color: var(--muted); font-size: .76rem; letter-spacing: .13em; font-weight: 500; }
+    .notes ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+    .notes li { padding-left: 16px; position: relative; line-height: 1.35; font-size: .82rem; }
+    .notes li::before { content: ">"; color: var(--acid); position: absolute; left: 0; }
+
+    .side-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+    .ghost, .solid {
+      min-height: 42px;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      background: transparent;
+      cursor: pointer;
+    }
+    .ghost:hover { border-color: var(--cyan); color: var(--cyan); }
+    .solid { background: var(--acid); border-color: var(--acid); color: #0a0e0b; font-weight: 900; }
+    .solid:hover { filter: brightness(1.1); }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      color: var(--muted);
+      font-size: .74rem;
+    }
+
+    .overlay {
+      position: fixed;
+      z-index: 50;
+      inset: 0;
+      padding: 22px;
+      display: grid;
+      place-items: center;
+      background: rgba(3,6,7,.89);
+      backdrop-filter: blur(9px);
+    }
+    .overlay[hidden] { display: none; }
+    .modal {
+      width: min(900px, 100%);
+      max-height: calc(100svh - 44px);
+      overflow: auto;
+      border: 1px solid #496157;
+      background: #0d1315;
+      box-shadow: 0 35px 100px #000;
+    }
+    .modal-top { padding: 20px 24px 15px; border-bottom: 1px solid var(--line); }
+    .eyebrow { color: var(--acid); font-size: .78rem; letter-spacing: .18em; }
+    .modal h1 { margin: 9px 0 8px; font-size: clamp(2rem, 7vw, 4.5rem); line-height: .95; letter-spacing: -.055em; }
+    .modal-intro { color: var(--muted); line-height: 1.55; max-width: 64ch; }
+    .briefing {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(260px, .9fr);
+      gap: 0;
+    }
+    .blueprint { padding: 24px; border-right: 1px solid var(--line); }
+    .blueprint svg { display: block; width: 100%; height: auto; background: #080c0e; }
+    .rules { padding: 24px; display: flex; flex-direction: column; }
+    .rules h2 { margin: 0 0 14px; font-size: .88rem; color: var(--muted); letter-spacing: .15em; }
+    .rules ol { margin: 0; padding-left: 1.2rem; line-height: 1.6; }
+    .rules li { margin-bottom: 9px; }
+    .rules .solid { margin-top: auto; min-height: 54px; font-size: 1rem; }
+    .memory-warning { color: var(--warning); margin: 15px 0 20px; font-size: .82rem; line-height: 1.5; }
+
+    .death-card, .win-card { width: min(560px, 100%); text-align: center; padding: 38px 28px; border: 1px solid var(--danger); background: #110b0c; box-shadow: 0 0 100px rgba(255,79,79,.12); }
+    .death-card .status { color: var(--danger); font-size: clamp(3rem, 12vw, 7.5rem); font-weight: 950; letter-spacing: -.06em; line-height: .85; }
+    .win-card { border-color: var(--acid); background: #0c120b; }
+    .win-card .status { color: var(--acid); font-size: clamp(2.5rem, 10vw, 6rem); font-weight: 950; letter-spacing: -.06em; line-height: .9; }
+    .death-reason, .win-copy { margin: 23px auto 12px; line-height: 1.55; }
+    .restart-line { color: var(--muted); font-size: .82rem; margin-bottom: 18px; }
+    .restart-progress { height: 3px; max-width: 260px; margin: 0 auto 18px; background: #32191b; overflow: hidden; }
+    .restart-progress i { display: block; height: 100%; background: var(--danger); animation: restart .95s linear forwards; }
+
+    .flash { animation: sceneFlash .28s linear; }
+    @keyframes pulse { 50% { opacity: .55; } }
+    @keyframes restart { from { width: 0; } to { width: 100%; } }
+    @keyframes sceneFlash { 50% { filter: brightness(1.8); } }
+
+    @media (max-width: 900px) {
+      .shell { padding: 10px; }
+      .topbar { grid-template-columns: 1fr auto; }
+      .timer-wrap { grid-row: 2; grid-column: 1 / -1; width: 100%; padding: 8px 0 10px; }
+      .run-id { grid-column: 2; }
+      .game-grid { grid-template-columns: 1fr; }
+      .scene { min-height: 540px; }
+      .sidebar { grid-template-columns: minmax(220px, .8fr) minmax(260px, 1fr); grid-template-rows: auto 1fr auto; }
+      .side-head { grid-column: 1 / -1; }
+      .notes { border-top: 0; border-left: 1px solid var(--line); padding: 4px 0 0 15px; }
+      .side-actions { grid-column: 1 / -1; }
+      .briefing { grid-template-columns: 1fr; }
+      .blueprint { border-right: 0; border-bottom: 1px solid var(--line); }
+    }
+
+    @media (max-width: 560px) {
+      .shell { padding: 0; gap: 0; }
+      .topbar { padding: 11px 13px 4px; }
+      .game-grid { gap: 0; }
+      .scene, .sidebar { border-left: 0; border-right: 0; }
+      .scene { min-height: 500px; }
+      .room-meta { padding: 13px; font-size: .76rem; }
+      .doors { width: 92%; gap: 16px; padding-bottom: 30px; }
+      .door { height: 230px; border-width: 5px; }
+      .door-direction { font-size: 2.4rem; }
+      .prompt { grid-template-columns: 1fr; padding: 13px; min-height: 105px; gap: 8px; }
+      .scan-chip { display: none; }
+      .sidebar { grid-template-columns: 1fr; grid-template-rows: auto auto auto auto; padding: 13px; }
+      .notes { border-left: 0; border-top: 1px solid var(--line); padding: 13px 0 0; }
+      .footer { padding: 12px; flex-direction: column; gap: 5px; }
+      .overlay { padding: 10px; }
+      .modal-top, .blueprint, .rules { padding: 17px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+    }
+  </style>
 </head>
 <body>
-  <div id="game-container">
-    <!-- 游戏画布 -->
-    <canvas id="game-canvas"></canvas>
+  <main class="shell" aria-label="空间迷宫游戏">
+    <header class="topbar">
+      <div class="brand">BOUNDARY <i>//</i> TEST 07</div>
+      <div class="timer-wrap" aria-live="polite">
+        <div id="timer" class="timer">18.0</div>
+        <div class="timer-bar"><div id="timerFill" class="timer-fill"></div></div>
+      </div>
+      <div id="runId" class="run-id">RUN 001</div>
+    </header>
 
-    <!-- 顶部一体化防重叠 HUD 状态栏 -->
-    <div id="hud">
-      <div class="hud-top-bar">
-        <!-- 左侧：头像与生命 + PC技能CD指示 -->
-        <div class="hud-section-left">
-          <span id="hud-avatar" class="hud-avatar">👨‍💼</span>
-          <div class="hp-wrapper">
-            <div class="bar-bg">
-              <div id="hud-hp-fill" class="hp-fill"></div>
-            </div>
-            <span id="hud-hp-text" class="hp-text">110 / 110</span>
+    <div class="game-grid">
+      <section id="scene" class="scene" aria-label="当前房间">
+        <div class="room-meta">
+          <div><strong id="roomLabel">房间 01 / 07</strong><br><span id="entryText">由南侧进入</span></div>
+          <div style="text-align:right">网格坐标<br><span id="coord" class="coord">X 00 · Y 03</span></div>
+        </div>
+
+        <div class="room-view">
+          <div class="ceiling-light"></div>
+          <div class="floor-lines"></div>
+          <div id="doors" class="doors"></div>
+        </div>
+
+        <div class="prompt">
+          <div>
+            <div id="promptMain" class="prompt-main">每个房间为 4 × 4 米。选择下一扇门。</div>
+            <div id="promptSub" class="prompt-sub">建筑外轮廓、设备井与已发现区域不会改变。</div>
           </div>
-          <div id="hud-pc-cd" class="hud-pc-cd">
-            <span id="hud-skill-status" class="hud-cd-badge ready">🔥 E: 就绪</span>
-            <span id="hud-dodge-status" class="hud-cd-badge ready">💨 闪避: 就绪</span>
+          <div class="scan-chip">测距仪：4.0 m / 格</div>
+        </div>
+      </section>
+
+      <aside class="sidebar" aria-label="探索地图与现场记录">
+        <div class="side-head">
+          <h2>DISCOVERED MAP</h2>
+          <span class="live-mark">LIVE</span>
+        </div>
+        <div class="map-frame">
+          <svg id="map" viewBox="0 0 500 400" role="img" aria-label="自动绘制的已发现地图"></svg>
+          <div class="map-legend">
+            <span><i class="legend-swatch" style="background:#b8ff43"></i>当前位置</span>
+            <span><i class="legend-swatch" style="background:#29413a"></i>已发现</span>
+            <span><i class="legend-swatch" style="background:#4c2c31"></i>设备井</span>
           </div>
         </div>
-
-        <!-- 中间：下班倒计时 -->
-        <div id="hud-time" class="hud-section-center">00:00 / 08:00</div>
-
-        <!-- 右侧：等级与经验 + 设置齿轮 -->
-        <div class="hud-section-right">
-          <div class="xp-wrapper">
-            <span id="hud-level" style="font-size:11px; font-weight:bold; color:#38bdf8;">Lv.1</span>
-            <div class="bar-bg" style="width: 60px;">
-              <div id="hud-xp-fill" class="xp-fill"></div>
-            </div>
-          </div>
-          <button id="btn-open-settings" class="btn-menu-icon">⚙️</button>
+        <div class="notes">
+          <h3>固定现场信息</h3>
+          <ul>
+            <li>建筑内尺寸：20 × 16 米</li>
+            <li>标准房间：4 × 4 米</li>
+            <li>入口：南墙，距西墙 2 米</li>
+            <li>出口：北墙，距西墙 14 米</li>
+            <li>设备井：入口以北 4 米、以东 8 米</li>
+          </ul>
         </div>
-      </div>
-
-      <!-- 底部固定压力条 (安全居中，不挡按键) -->
-      <div class="hud-bottom-center">
-        <div class="pressure-bar-bg">
-          <div id="hud-pressure-fill" class="pressure-fill"></div>
+        <div class="side-actions">
+          <button id="briefBtn" class="ghost" type="button">查看开局简报 [B]</button>
+          <button id="resetBtn" class="ghost" type="button" title="重置本轮">↻</button>
         </div>
-        <div id="hud-pressure-text" class="pressure-text">压力: 0/100 【正常】</div>
-      </div>
+      </aside>
     </div>
 
-    <!-- 手机端虚拟触控 -->
-    <div id="mobile-controls">
-      <div id="joystick-zone">
-        <div id="joystick-base">
-          <span class="joystick-arrow arrow-up">▲</span>
-          <span class="joystick-arrow arrow-down">▼</span>
-          <span class="joystick-arrow arrow-left">◀</span>
-          <span class="joystick-arrow arrow-right">▶</span>
-          <div id="joystick-nub"><span>🕹️</span></div>
+    <footer class="footer">
+      <span>操作：点击门 / 数字键 1、2</span>
+      <span>规则：越界、撞入结构核心或返回已占用空间 = 立即死亡</span>
+    </footer>
+  </main>
+
+  <section id="briefOverlay" class="overlay" aria-modal="true" role="dialog" aria-labelledby="briefTitle">
+    <div class="modal">
+      <div class="modal-top">
+        <div class="eyebrow">PRE-RUN SURVEY // 仅展示一次的建筑观察</div>
+        <h1 id="briefTitle">记住这栋楼。</h1>
+        <div class="modal-intro">你会进入连续的标准房间。门上的方向不是答案；建筑的尺寸、固定设备井和你走过的轨迹才是答案。</div>
+      </div>
+      <div class="briefing">
+        <div class="blueprint">
+          <svg viewBox="0 0 540 420" aria-label="建筑外部测量简图">
+            <defs>
+              <pattern id="grid" width="80" height="80" patternUnits="userSpaceOnUse">
+                <path d="M 80 0 L 0 0 0 80" fill="none" stroke="#20302a" stroke-width="1" stroke-dasharray="5 7"/>
+              </pattern>
+            </defs>
+            <rect x="70" y="50" width="400" height="320" fill="url(#grid)" stroke="#b8ff43" stroke-width="3"/>
+            <rect x="230" y="210" width="80" height="80" fill="#351d21" stroke="#ff4f4f" stroke-width="2"/>
+            <path d="M70 370h40 M90 370v28" stroke="#61e8d4" stroke-width="6"/>
+            <path d="M330 50h80 M370 50V22" stroke="#b8ff43" stroke-width="6"/>
+            <path d="M70 32h400 M70 25v14 M470 25v14" stroke="#85958e" stroke-width="2"/>
+            <path d="M48 50v320 M41 50h14 M41 370h14" stroke="#85958e" stroke-width="2"/>
+            <text x="270" y="22" text-anchor="middle" fill="#e7f4ed" font-size="18">20 m</text>
+            <text x="29" y="215" text-anchor="middle" fill="#e7f4ed" font-size="18" transform="rotate(-90 29 215)">16 m</text>
+            <text x="270" y="253" text-anchor="middle" fill="#ff7777" font-size="15">设备井</text>
+            <text x="90" y="416" text-anchor="middle" fill="#61e8d4" font-size="15">入口</text>
+            <text x="370" y="18" text-anchor="middle" fill="#b8ff43" font-size="15">出口</text>
+            <text x="464" y="397" text-anchor="end" fill="#85958e" font-size="13">每格 4 × 4 m</text>
+            <path d="M500 85v-28 M500 57l-8 12 M500 57l8 12" stroke="#e7f4ed" stroke-width="2"/>
+            <text x="500" y="47" text-anchor="middle" fill="#e7f4ed" font-size="14">N</text>
+          </svg>
         </div>
-      </div>
-
-      <div class="action-buttons">
-        <button id="btn-skill" class="action-btn">
-          <span style="font-size: 20px;">🔥</span>
-          <span style="font-size: 11px;">大招</span>
-        </button>
-        <button id="btn-dodge" class="action-btn btn-dodge-style">
-          <span style="font-size: 20px;">💨</span>
-          <span style="font-size: 11px;">闪避</span>
-        </button>
-      </div>
-    </div>
-
-    <div id="rotate-device-hint" class="rotate-device-hint" aria-live="polite">
-      <div class="rotate-device-card">
-        <div class="rotate-device-icon">📱↔️</div>
-        <div class="rotate-device-title">请将手机旋转为横屏</div>
-        <div class="rotate-device-sub">横屏下摇杆、技能键和 HUD 会自动进入战斗布局</div>
-      </div>
-    </div>
-
-    <!-- 主菜单 -->
-    <div id="main-menu">
-      <div class="game-logo">今天也不想上班</div>
-      <div class="game-sub">全自动智能索敌 · 多稀有度武器池 · 办公室区域事件 · 横屏修复 (V2.0)</div>
-      <div class="menu-buttons">
-        <button id="btn-start-game" class="btn" style="padding: 12px 24px; font-size: 15px;">🚀 开始下班 (进入游戏)</button>
-        <button id="btn-open-characters" class="btn btn-secondary">🎭 职业角色 (小陈/阿伟/莉莉/小张)</button>
-        <button id="btn-open-stages" class="btn btn-secondary">🏢 关卡选择 (周一至周末 + 无尽加班)</button>
-        <button id="btn-open-talents" class="btn btn-secondary">📋 员工晋升 (提升角色与武器属性)</button>
-        <button id="btn-open-guide" class="btn btn-secondary">📖 职场生存指南 (操作、武器与Boss)</button>
-      </div>
-    </div>
-
-    <!-- 角色选择弹窗 -->
-    <div id="character-modal" class="modal-overlay">
-      <div class="modal-content">
-        <button id="btn-close-char-x" class="modal-close-x">✕</button>
-        <div class="modal-title">🎭 选择出战角色</div>
-        <div class="modal-subtitle">每个角色拥有独特的初始武器、被动天赋与专属大招</div>
-        <div id="character-cards-container" class="char-grid"></div>
-        <div style="display: flex; gap: 10px; justify-content: center; margin-top: 10px;">
-          <button id="btn-close-characters" class="btn">确定选择</button>
-          <button id="btn-back-characters" class="btn btn-secondary">返回主页</button>
+        <div class="rules">
+          <h2>测试规则</h2>
+          <ol>
+            <li>每间房有两扇门，倒计时结束即死亡。</li>
+            <li>任何错误门都会立即触发清除。</li>
+            <li>地图只记录你真正进入过的房间，不标答案。</li>
+            <li>抵达北墙出口即完成测试。</li>
+          </ol>
+          <div class="memory-warning">简报可以再次查看，但计时不会暂停。第一次进入前，计时尚未开始。</div>
+          <button id="startBtn" class="solid" type="button">进入建筑 [ENTER]</button>
         </div>
       </div>
     </div>
+  </section>
 
-    <!-- 关卡选择弹窗 -->
-    <div id="stage-modal" class="modal-overlay">
-      <div class="modal-content">
-        <button id="btn-close-stage-x" class="modal-close-x">✕</button>
-        <div class="modal-title">🏢 选择挑战关卡</div>
-        <div class="modal-subtitle">通关逐级解锁 · 周一至周末 + 无尽模式（各具专属Boss与地形机制）</div>
-        <div id="stage-cards-container" class="stage-grid"></div>
-        <div style="display: flex; gap: 10px; justify-content: center; margin-top: 10px;">
-          <button id="btn-close-stages" class="btn">确定关卡</button>
-          <button id="btn-back-stages" class="btn btn-secondary">返回主页</button>
-        </div>
-      </div>
+  <section id="deathOverlay" class="overlay" hidden aria-live="assertive">
+    <div class="death-card">
+      <div class="status">DEAD</div>
+      <div id="deathReason" class="death-reason">所选位置超出建筑边界。</div>
+      <div class="restart-line">快速重建测试空间…</div>
+      <div class="restart-progress"><i></i></div>
+      <button id="retryBtn" class="ghost" type="button">立即重试 [ENTER]</button>
     </div>
+  </section>
 
-    <!-- 快捷设置与调试弹窗 -->
-    <div id="settings-menu-modal" class="modal-overlay">
-      <div class="modal-content">
-        <button id="btn-close-settings-x" class="modal-close-x">✕</button>
-        <div class="modal-title">⚙️ 游戏设置与调试</div>
-        <div class="settings-menu-list">
-          <button id="btn-toggle-sound" class="btn btn-secondary">🔊 音效: 开</button>
-          <button id="btn-toggle-speed" class="btn btn-secondary">⏱️ 游戏速度: 1x</button>
-          <button id="btn-toggle-controls" class="btn btn-secondary">🎮 虚拟摇杆: 开</button>
-          <button id="btn-landscape-mode" class="btn btn-secondary">📱 横屏模式</button>
-          <button id="btn-test-boss" class="btn btn-secondary" style="color: #ef4444;">👹 召唤当前关卡Boss (测试)</button>
-          <button id="btn-pause-from-settings" class="btn">摸鱼暂停游戏</button>
-        </div>
-        <button id="btn-close-settings" class="btn btn-secondary">关闭</button>
-      </div>
+  <section id="winOverlay" class="overlay" hidden aria-modal="true" role="dialog">
+    <div class="win-card">
+      <div class="status">EXIT FOUND</div>
+      <div id="winCopy" class="win-copy">你用空间记录穿过了 7 个房间。</div>
+      <button id="againBtn" class="solid" type="button">再次测试</button>
     </div>
+  </section>
 
-    <!-- 升级三选一弹窗 -->
-    <div id="levelup-modal" class="modal-overlay">
-      <div class="modal-content">
-        <div class="modal-title">🎉 工作能力提升！</div>
-        <div class="modal-subtitle">选择一项工作技能、新武器或进化超级武器</div>
-        <div id="levelup-cards" class="card-container"></div>
-        <button id="levelup-reroll-btn" class="btn btn-secondary">刷新选项 (1次免费)</button>
-      </div>
-    </div>
+  <script>
+    (() => {
+      "use strict";
 
-    <!-- 神器选择弹窗 -->
-    <div id="artifact-modal" class="modal-overlay">
-      <div class="modal-content">
-        <div class="modal-title" style="color: #a855f7;">🎁 获得职场神器！</div>
-        <div class="modal-subtitle">从精英怪掉落中挑选1件神装</div>
-        <div id="artifact-cards" class="card-container"></div>
-      </div>
-    </div>
+      const ROOM_SECONDS = 18;
+      const route = [
+        { x:0, y:3, entered:"南", doors:[
+          { dir:"西", arrow:"←", correct:false, reason:"西门落在建筑外墙之外。建筑西边界已经在你身后。" },
+          { dir:"东", arrow:"→", correct:true }
+        ]},
+        { x:1, y:3, entered:"西", doors:[
+          { dir:"南", arrow:"↓", correct:false, reason:"南门会穿过建筑外墙。这里已经是最南一排房间。" },
+          { dir:"北", arrow:"↑", correct:true }
+        ]},
+        { x:1, y:2, entered:"南", doors:[
+          { dir:"东", arrow:"→", correct:false, reason:"东侧 4 米处是简报标出的固定设备井。那里不可能存在房间。" },
+          { dir:"北", arrow:"↑", correct:true }
+        ]},
+        { x:1, y:1, entered:"南", doors:[
+          { dir:"南", arrow:"↓", correct:false, reason:"南门会回到已占用的上一房间；门后宣称的新空间与现有地图重叠。" },
+          { dir:"东", arrow:"→", correct:true }
+        ]},
+        { x:2, y:1, entered:"西", doors:[
+          { dir:"南", arrow:"↓", correct:false, reason:"南侧正是固定设备井。你在简报和地图上都见过它的位置。" },
+          { dir:"东", arrow:"→", correct:true }
+        ]},
+        { x:3, y:1, entered:"西", doors:[
+          { dir:"西", arrow:"←", correct:false, reason:"西门后的坐标已经被上一房间占用。空间会发生重叠。" },
+          { dir:"北", arrow:"↑", correct:true }
+        ]},
+        { x:3, y:0, entered:"南", doors:[
+          { dir:"南", arrow:"↓", correct:false, reason:"南门指回已占用房间。出口位于北墙，距西墙 14 米。" },
+          { dir:"北", arrow:"↑", correct:true, exit:true }
+        ]}
+      ];
 
-    <!-- 暂停弹窗 -->
-    <div id="pause-modal" class="modal-overlay">
-      <div class="modal-content">
-        <div class="modal-title">⏸️ 摸鱼休息中</div>
-        <div id="pause-stats-content" style="text-align: left; margin-bottom: 16px; line-height: 1.8;"></div>
-        <div style="display: flex; gap: 10px; justify-content: center;">
-          <button id="btn-resume-game" class="btn">继续战斗</button>
-          <button id="btn-quit-game" class="btn btn-secondary">退出回主页</button>
-        </div>
-      </div>
-    </div>
+      const el = id => document.getElementById(id);
+      const timerEl = el("timer");
+      const timerFill = el("timerFill");
+      const roomLabel = el("roomLabel");
+      const entryText = el("entryText");
+      const coord = el("coord");
+      const doorsEl = el("doors");
+      const scene = el("scene");
+      const briefOverlay = el("briefOverlay");
+      const deathOverlay = el("deathOverlay");
+      const winOverlay = el("winOverlay");
 
-    <!-- 游戏失败弹窗 -->
-    <div id="gameover-modal" class="modal-overlay">
-      <div class="modal-content">
-        <div class="modal-title" style="color: #ef4444;">📁 今日工作未完成...</div>
-        <div class="modal-subtitle">被文件堆埋住了，未能成功下班</div>
-        <div class="result-stats">
-          <div class="result-item">存活时间：<b id="gameover-time">00:00</b></div>
-          <div class="result-item">击杀工作：<b id="gameover-kills">0</b></div>
-          <div class="result-item">最高压力：<b id="gameover-pressure">0%</b></div>
-          <div class="result-item">完美闪避：<b id="gameover-dodges">0</b></div>
-          <div class="result-item" style="grid-column: span 2;">获得工资：<b id="gameover-gold" style="color: #10b981;">+0</b></div>
-        </div>
-        <div style="display: flex; gap: 10px; justify-content: center;">
-          <button id="btn-restart-gameover" class="btn">再开一局</button>
-          <button id="btn-menu-gameover" class="btn btn-secondary">返回主菜单</button>
-        </div>
-      </div>
-    </div>
+      let roomIndex = 0;
+      let runNumber = 1;
+      let deaths = 0;
+      let remaining = ROOM_SECONDS;
+      let frame = null;
+      let deadline = 0;
+      let playing = false;
+      let dead = false;
+      let restartTimer = null;
 
-    <!-- 游戏胜利弹窗 -->
-    <div id="victory-modal" class="modal-overlay">
-      <div class="modal-content">
-        <div class="modal-title" style="color: #10b981;">🎉 18:00 准点下班！</div>
-        <div class="modal-subtitle">成功击败Boss，打卡下班！“明天也要准时上班。”</div>
-        <div class="result-stats">
-          <div class="result-item">存活时间：<b id="victory-time">08:00</b></div>
-          <div class="result-item">击杀工作：<b id="victory-kills">0</b></div>
-          <div class="result-item">最高压力：<b id="victory-pressure">0%</b></div>
-          <div class="result-item">完美闪避：<b id="victory-dodges">0</b></div>
-          <div class="result-item" style="grid-column: span 2;">获得工资：<b id="victory-gold" style="color: #10b981;">+0</b></div>
-          <div class="build-showcase">本局Build：<span id="victory-build">-</span></div>
-        </div>
-        <div style="display: flex; gap: 10px; justify-content: center;">
-          <button id="btn-restart-victory" class="btn">再开一局</button>
-          <button id="btn-menu-victory" class="btn btn-secondary">返回主菜单</button>
-        </div>
-      </div>
-    </div>
+      function pad(n) { return String(n).padStart(2, "0"); }
 
-    <!-- 员工晋升与属性研习弹窗 -->
-    <div id="talent-modal" class="modal-overlay">
-      <div class="modal-content">
-        <button id="btn-close-talent-x" class="modal-close-x">✕</button>
-        <div class="modal-title">📋 员工晋升与属性研习</div>
-        <div id="talent-gold" class="modal-subtitle" style="color: #fbbf24; font-weight: bold;">当前存款工资：¥ 0</div>
-        <div id="talent-list" class="talent-list"></div>
-        <button id="btn-close-talents" class="btn" style="margin-top: 10px;">返回主页</button>
-      </div>
-    </div>
+      function renderRoom() {
+        const room = route[roomIndex];
+        roomLabel.textContent = `房间 ${pad(roomIndex + 1)} / ${pad(route.length)}`;
+        entryText.textContent = `由${room.entered}侧进入 · 朝向固定为北`;
+        coord.textContent = `X ${pad(room.x)} · Y ${pad(room.y)}`;
+        doorsEl.replaceChildren();
 
-    <!-- 玩法指南弹窗 -->
-    <div id="guide-modal" class="modal-overlay">
-      <div class="modal-content" style="text-align: left;">
-        <button id="btn-close-guide-x" class="modal-close-x">✕</button>
-        <div class="modal-title" style="text-align: center;">📖 职场生存与全武器指南 (V1.7)</div>
-        <div style="font-size: 11px; line-height: 1.6; color: #cbd5e1; margin-bottom: 14px; max-height: 60vh; overflow-y: auto;">
-          <p><b>【全自动索敌机制】</b></p>
-          <p>• 所有武器均已升级为<b>全场景智能自动索敌</b>，优先攻击敌人聚集密度最高、威胁最大的区域，无需手动对准方向，专注移动与走位！</p>
-          <br>
-          <p><b>【14类武器、稀有度与超级进化】</b></p>
-          <p>• <b>人体工学椅 (新)：</b> 诺手Q式360°旋转大杀四方！每5秒狂暴横扫一圈，外圈造成巨额暴击伤害、强力击退并恢复摸鱼值与生命！进化：<b>老板真皮按摩椅</b>（全方位气动旋风斩+气动护盾）。</p>
-          <p>• <b>空调·制冷 (新)：</b> 喷射极寒冷气，伤害较低但可将命中的敌人<b>冻结 1.0 秒</b>（完全定身停止移动与攻击）并附加减速！</p>
-          <p>• <b>空调·制热 (新)：</b> 喷射滚烫热风波，高额初始伤害并对敌人附加<b>持续灼烧热伤害（DoT）</b>！</p>
-          <p>• <b>💥 中央空调·冰火两重天 (共鸣超武)：</b> 同时拥有制冷与制热模式时激活！周期性在最密集敌群引爆大范围<b>冷热对流核爆（范围爆炸攻击）</b>，对冻结敌人造成双倍碎冰毁灭暴击并点燃全场！</p>
-          <p>• <b>机械键盘：</b> 远程高射速键帽，自动追踪敌群。进化：<b>祖安机械键盘</b>（连锁“？？？”爆炸）。</p>
-          <p>• <b>马克杯：</b> 大范围环绕扫荡与咖啡水花溅射。进化：<b>无限续杯</b>（周期释放4米咖啡冲击波）。</p>
-          <p>• <b>辞职信：</b> 自动锁定密集敌群抛射公文袋轰炸，留下腐蚀水洼。进化：<b>辞职报告</b>（全屏密集处巨力砸落）。</p>
-          <p>• <b>降噪耳机：</b> 360° 全方位高频声波震荡穿透全怪。进化：<b>降噪核爆耳机</b>（震碎敌方弹道）。</p>
-          <p>• <b>养生水杯：</b> 自动向敌群投掷水杯落地碎裂，形成大水洼。进化：<b>高压八杯水领域</b>（全场暴雨回血）。</p>
-          <p>• <b>快充充电线：</b> 自动向敌群扇形横扫高压电弧 + 链式闪电弹跳。进化：<b>超导快充高压鞭</b>（全屏超导雷击+电网）。</p>
-          <p>• <b>无线鼠标：</b> 普通品质，高频自动索敌，适合前期稳定清怪。</p>
-          <p>• <b>重型订书机：</b> 稀有品质，散射爆发并可成长为穿透弹幕。</p>
-          <p>• <b>打印机风暴：</b> 稀有品质，周期性向四周喷射环形纸张弹幕。</p>
-          <p>• <b>会议投影仪：</b> 史诗品质，自动向敌群释放大角度高伤光束。</p>
-          <p>• <b>服务器宕机：</b> <span style="color:#fbbf24;font-weight:bold;">金色传说</span>，低概率出现，周期性对最密集敌群发动超大范围高伤核爆。</p>
-          <br>
-          <p><b>【全周关卡、无尽模式与强力Boss】</b></p>
-          <p>• <b>关卡解锁体系：</b> 通关前置关卡即可解锁下一关，挑战逐步升级！</p>
-          <p>• <b>周一 (部门主管)：</b> 文件雨轰炸与紧急需求连发。</p>
-          <p>• <b>周二 (项目总监)：</b> PPT激光网与连环对齐会。</p>
-          <p>• <b>周三 (刁难的客户 - 新Boss)：</b> 划定“需求红线”封锁禁行区、砸下“巨型合同柱”可破坏障碍物限制移动、释放“方案打回”引力黑洞！</p>
-          <p>• <b>周四 (骚扰电话 - 新Boss)：</b> 植入“响铃分机”减速声波塔、震裂地面形成电波断层、“夺命连环call”追踪弹幕与全屏EMP脉冲！</p>
-          <p>• <b>周五 (大老板·CEO) & 周末 (团建魔鬼教练)</b></p>
-          <p>• <b>🔥 无尽模式 · 通宵加班：</b> 没有下班时间上限！怪物随时间无限狂暴成长，每90秒随机刷新强力Boss轮番突袭，挑战你的最高生存极限！</p>
-          <br>
-          <p><b>【员工晋升与属性研习系统】</b></p>
-          <p>• 消耗打工赚取的工资存款，分别强化<b>【角色个人属性】</b>（生命、移速、回血、抗压、拾取、暴击、悟性、薪资）与<b>【武器全局属性】</b>（武器伤害、攻速CD、范围AoE、弹速、击退、超武共鸣），并支持随时一键全额重置退款！</p>
-        </div>
-        <div style="text-align: center;">
-          <button id="btn-close-guide" class="btn">我明白了</button>
-        </div>
-      </div>
-    </div>
-  </div>
+        room.doors.forEach((door, i) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "door";
+          btn.setAttribute("aria-label", `${i + 1}号门，向${door.dir}`);
+          btn.innerHTML = `<span class="door-key">${i + 1}</span><span class="door-direction">${door.arrow}</span><span class="door-name">${door.dir}门</span>`;
+          btn.addEventListener("click", () => chooseDoor(i));
+          doorsEl.appendChild(btn);
+        });
 
-  <script type="module" src="js/main.js?v=2.1"></script>
+        el("promptMain").textContent = roomIndex === route.length - 1
+          ? "你在建筑最北一排。出口测量位置：北墙，距西墙 14 米。"
+          : "每个房间为 4 × 4 米。将新位置与边界、设备井和已走路线对照。";
+        el("promptSub").textContent = `已确认 ${roomIndex + 1} 个房间 · 当前距西墙 ${room.x * 4}–${(room.x + 1) * 4} 米`;
+        drawMap();
+        resetRoomTimer();
+      }
+
+      function drawMap() {
+        const svg = el("map");
+        const ns = "http://www.w3.org/2000/svg";
+        svg.replaceChildren();
+
+        const make = (name, attrs, text) => {
+          const node = document.createElementNS(ns, name);
+          Object.entries(attrs || {}).forEach(([k,v]) => node.setAttribute(k, v));
+          if (text != null) node.textContent = text;
+          svg.appendChild(node);
+          return node;
+        };
+
+        make("rect", {x:25,y:25,width:450,height:350,fill:"#0a0f11",stroke:"#41584e","stroke-width":3});
+        for (let i=1;i<5;i++) make("line", {x1:25+i*90,y1:25,x2:25+i*90,y2:375,stroke:"#18231f","stroke-width":1,"stroke-dasharray":"5 8"});
+        for (let i=1;i<4;i++) make("line", {x1:25,y1:25+i*87.5,x2:475,y2:25+i*87.5,stroke:"#18231f","stroke-width":1,"stroke-dasharray":"5 8"});
+
+        const sx = 25 + 2*90, sy = 25 + 2*87.5;
+        make("rect", {x:sx+6,y:sy+6,width:78,height:75.5,fill:"#351e22",stroke:"#ff4f4f","stroke-width":1.5});
+        make("text", {x:sx+45,y:sy+47,fill:"#d36b74","font-size":12,"text-anchor":"middle"}, "设备井");
+
+        const discovered = route.slice(0, roomIndex + 1);
+        discovered.forEach((r, i) => {
+          if (i === 0) return;
+          const p = route[i-1];
+          make("line", {
+            x1:25+p.x*90+45, y1:25+p.y*87.5+43.75,
+            x2:25+r.x*90+45, y2:25+r.y*87.5+43.75,
+            stroke:"#61e8d4", "stroke-width":4, "stroke-linecap":"round"
+          });
+        });
+        discovered.forEach((r, i) => {
+          const x = 25 + r.x*90 + 5, y = 25 + r.y*87.5 + 5;
+          const current = i === roomIndex;
+          make("rect", {x,y,width:80,height:77.5,fill:current?"#b8ff43":"#233b34",stroke:current?"#e7f4ed":"#4f7768","stroke-width":current?3:1.5});
+          make("text", {x:x+40,y:y+40,fill:current?"#09100b":"#b8c9c0","font-size":15,"font-weight":700,"text-anchor":"middle","dominant-baseline":"middle"}, `R${i+1}`);
+        });
+
+        make("path", {d:"M25 375h38 M45 375v17",stroke:"#61e8d4","stroke-width":5,fill:"none"});
+        make("text", {x:45,y:414,fill:"#61e8d4","font-size":13,"text-anchor":"middle"}, "入口");
+        make("path", {d:"M295 25h80 M335 25V8",stroke:"#b8ff43","stroke-width":5,fill:"none"});
+        make("text", {x:335,y:399,fill:"#61736b","font-size":12,"text-anchor":"middle"}, "20m × 16m");
+      }
+
+      function resetRoomTimer() {
+        cancelAnimationFrame(frame);
+        remaining = ROOM_SECONDS;
+        deadline = performance.now() + ROOM_SECONDS * 1000;
+        paintTimer(remaining);
+        if (playing && !dead) frame = requestAnimationFrame(tick);
+      }
+
+      function paintTimer(value) {
+        timerEl.textContent = Math.max(0, value).toFixed(1);
+        timerFill.style.transform = `scaleX(${Math.max(0, value / ROOM_SECONDS)})`;
+        timerEl.classList.toggle("danger", value <= 5);
+        timerFill.style.background = value <= 5 ? "var(--danger)" : "var(--acid)";
+      }
+
+      function tick(now) {
+        if (!playing || dead) return;
+        remaining = (deadline - now) / 1000;
+        paintTimer(remaining);
+        if (remaining <= 0) {
+          die("倒计时归零。当前房间已封闭。", true);
+          return;
+        }
+        frame = requestAnimationFrame(tick);
+      }
+
+      function chooseDoor(index) {
+        if (!playing || dead) return;
+        const choice = route[roomIndex].doors[index];
+        if (!choice) return;
+        scene.classList.remove("flash");
+        void scene.offsetWidth;
+        scene.classList.add("flash");
+        if (!choice.correct) {
+          die(choice.reason, false);
+          return;
+        }
+        if (choice.exit) {
+          win();
+          return;
+        }
+        playing = false;
+        cancelAnimationFrame(frame);
+        setTimeout(() => {
+          roomIndex += 1;
+          playing = true;
+          renderRoom();
+        }, 170);
+      }
+
+      function die(reason, timeout) {
+        dead = true;
+        playing = false;
+        cancelAnimationFrame(frame);
+        deaths += 1;
+        el("deathReason").textContent = reason;
+        deathOverlay.hidden = false;
+        if (timeout) timerEl.textContent = "0.0";
+        clearTimeout(restartTimer);
+        restartTimer = setTimeout(restart, 950);
+      }
+
+      function restart() {
+        clearTimeout(restartTimer);
+        deathOverlay.hidden = true;
+        winOverlay.hidden = true;
+        runNumber += 1;
+        roomIndex = 0;
+        dead = false;
+        playing = true;
+        el("runId").textContent = `RUN ${String(runNumber).padStart(3, "0")}`;
+        renderRoom();
+      }
+
+      function win() {
+        playing = false;
+        cancelAnimationFrame(frame);
+        el("winCopy").textContent = `你用空间记录穿过了 ${route.length} 个房间。本次测试死亡 ${deaths} 次。`;
+        winOverlay.hidden = false;
+      }
+
+      function begin() {
+        briefOverlay.hidden = true;
+        if (!playing && !dead && winOverlay.hidden) {
+          playing = true;
+          resetRoomTimer();
+        }
+      }
+
+      function showBrief() {
+        briefOverlay.hidden = false;
+        el("startBtn").textContent = playing ? "返回当前房间 [ENTER]" : "进入建筑 [ENTER]";
+      }
+
+      el("startBtn").addEventListener("click", begin);
+      el("briefBtn").addEventListener("click", showBrief);
+      el("resetBtn").addEventListener("click", restart);
+      el("retryBtn").addEventListener("click", restart);
+      el("againBtn").addEventListener("click", restart);
+
+      document.addEventListener("keydown", e => {
+        if (e.key.toLowerCase() === "b" && briefOverlay.hidden && deathOverlay.hidden && winOverlay.hidden) {
+          showBrief();
+          return;
+        }
+        if (e.key === "Enter") {
+          if (!deathOverlay.hidden) restart();
+          else if (!winOverlay.hidden) restart();
+          else if (!briefOverlay.hidden) begin();
+          return;
+        }
+        if (briefOverlay.hidden && deathOverlay.hidden && winOverlay.hidden) {
+          if (e.key === "1") chooseDoor(0);
+          if (e.key === "2") chooseDoor(1);
+        }
+      });
+
+      renderRoom();
+      playing = false;
+    })();
+  </script>
 </body>
 </html>
