@@ -2,755 +2,813 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>BOUNDARY // 空间测试</title>
-  <meta name="description" content="一个基于建筑边界与空间记忆的房间迷宫小游戏原型。">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%23090d10'/%3E%3Cpath d='M13 12h38v40H13zM25 12v12h14V12M13 36h12v16M39 36h12v16' fill='none' stroke='%23e7f4ed' stroke-width='5'/%3E%3Ccircle cx='34' cy='38' r='3' fill='%23ff4f4f'/%3E%3C/svg%3E">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>壳体试验｜空间推理试玩</title>
+  <meta name="description" content="无地图、无坐标的限时空间推理试玩。">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%23090b0c'/%3E%3Cpath d='M15 12h34v40H15z' fill='none' stroke='%23e6ff4a' stroke-width='5'/%3E%3Cpath d='M27 52V34h14v18' fill='none' stroke='%23e6ff4a' stroke-width='5'/%3E%3C/svg%3E">
   <style>
     :root {
       color-scheme: dark;
-      --ink: #e7f4ed;
-      --muted: #85958e;
-      --dark: #090d10;
-      --panel: #10171a;
-      --panel-2: #151e21;
-      --line: #304139;
-      --acid: #b8ff43;
-      --cyan: #61e8d4;
-      --danger: #ff4f4f;
-      --warning: #ffc857;
-      --shadow: rgba(0,0,0,.45);
-      --room-light: #25302c;
+      --ink: #eef0e7;
+      --muted: #9da198;
+      --acid: #e6ff4a;
+      --danger: #ff4b42;
+      --line: #343936;
+      --panel: #121615;
+      --deep: #080a0a;
     }
 
     * { box-sizing: border-box; }
-    html, body { min-height: 100%; }
-    body {
+
+    html, body {
+      min-height: 100%;
       margin: 0;
-      min-height: 100vh;
-      min-height: 100svh;
+      background: var(--deep);
       color: var(--ink);
-      background:
-        linear-gradient(rgba(184,255,67,.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(184,255,67,.025) 1px, transparent 1px),
-        radial-gradient(circle at 45% -20%, #18302c 0, transparent 46%),
-        var(--dark);
-      background-size: 36px 36px, 36px 36px, auto, auto;
-      font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", "Microsoft YaHei", monospace;
+      font-family: "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
       overflow-x: hidden;
+      background:
+        linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px),
+        radial-gradient(circle at 50% 30%, #18201e 0, #090b0b 46%, #050606 100%);
+      background-size: 28px 28px, 28px 28px, auto;
     }
 
     button { font: inherit; }
-    button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 3px; }
 
-    .shell {
-      width: min(1420px, 100%);
+    .app {
+      width: min(1120px, 100%);
       min-height: 100vh;
-      min-height: 100svh;
       margin: 0 auto;
-      padding: 18px;
-      display: grid;
-      grid-template-rows: auto 1fr auto;
-      gap: 14px;
+      padding: 18px clamp(14px, 3vw, 34px) 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
     }
 
     .topbar {
+      min-height: 70px;
       display: grid;
       grid-template-columns: 1fr auto 1fr;
       align-items: center;
-      min-height: 54px;
-      border-bottom: 1px solid var(--line);
-      letter-spacing: .08em;
+      gap: 14px;
+      border-block: 1px solid var(--line);
     }
 
-    .brand { font-weight: 800; font-size: clamp(1rem, 2.5vw, 1.35rem); }
-    .brand i { color: var(--acid); font-style: normal; }
-    .run-id { justify-self: end; color: var(--muted); font-size: .86rem; }
-
-    .timer-wrap {
-      width: clamp(150px, 25vw, 300px);
-      text-align: center;
+    .project-mark {
+      letter-spacing: .16em;
+      font-weight: 800;
+      font-size: .9rem;
     }
-    .timer {
-      color: var(--acid);
-      font-size: clamp(1.7rem, 4vw, 2.8rem);
+
+    .shell-record {
+      justify-self: center;
+      color: var(--muted);
+      font-size: .88rem;
+      letter-spacing: .06em;
+      white-space: nowrap;
+    }
+
+    .shell-record strong { color: var(--ink); font-size: 1rem; }
+
+    .clock-wrap {
+      justify-self: end;
+      text-align: right;
+      min-width: 118px;
+    }
+
+    .clock-label {
+      display: block;
+      color: var(--muted);
+      font-size: .72rem;
+      letter-spacing: .16em;
+      margin-bottom: 2px;
+    }
+
+    #clock {
+      font-family: ui-monospace, "Cascadia Mono", monospace;
+      font-size: clamp(1.55rem, 4vw, 2.35rem);
       line-height: 1;
       font-variant-numeric: tabular-nums;
-      text-shadow: 0 0 20px rgba(184,255,67,.15);
+      color: var(--acid);
     }
-    .timer.danger { color: var(--danger); animation: pulse .55s step-end infinite; }
-    .timer-bar { height: 3px; margin-top: 8px; background: #233029; }
-    .timer-fill { height: 100%; width: 100%; background: var(--acid); transform-origin: left; }
 
-    .game-grid {
-      min-height: 0;
+    #clock.urgent { color: var(--danger); animation: pulse .58s steps(2) infinite; }
+
+    @keyframes pulse { 50% { opacity: .48; } }
+
+    .game {
+      flex: 1;
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 330px;
-      gap: 14px;
+      grid-template-columns: minmax(0, 1fr) minmax(270px, 330px);
+      gap: clamp(16px, 3vw, 30px);
+      align-items: stretch;
     }
 
-    .scene, .sidebar {
+    .view {
+      min-height: 520px;
       border: 1px solid var(--line);
-      background: rgba(11,16,18,.93);
-      box-shadow: 0 20px 70px var(--shadow);
-    }
-
-    .scene {
       position: relative;
-      min-height: 590px;
       overflow: hidden;
-      display: grid;
-      grid-template-rows: auto 1fr auto;
+      background: #0d1010;
+      isolation: isolate;
     }
 
-    .scene::before {
+    .view::before {
       content: "";
-      pointer-events: none;
       position: absolute;
       inset: 0;
-      background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(255,255,255,.012) 3px 4px);
-      z-index: 8;
+      z-index: 5;
+      pointer-events: none;
+      background: repeating-linear-gradient(0deg, transparent 0 4px, rgba(0,0,0,.12) 5px);
+      mix-blend-mode: multiply;
     }
 
-    .room-meta {
-      z-index: 2;
-      padding: 18px 20px;
+    .ceiling {
+      position: absolute;
+      inset: 0 0 auto;
+      height: 22%;
+      clip-path: polygon(0 0, 100% 0, 78% 100%, 22% 100%);
+      background: linear-gradient(#171b1a, #242a27);
+      border-bottom: 1px solid #3b423e;
+    }
+
+    .floor {
+      position: absolute;
+      inset: auto 0 0;
+      height: 36%;
+      clip-path: polygon(22% 0, 78% 0, 100% 100%, 0 100%);
+      background:
+        linear-gradient(90deg, transparent 49.8%, rgba(230,255,74,.06) 50%, transparent 50.2%),
+        repeating-linear-gradient(96deg, transparent 0 80px, rgba(255,255,255,.04) 81px),
+        linear-gradient(#151918, #090b0b);
+      border-top: 1px solid #343a37;
+    }
+
+    .wall {
+      position: absolute;
       display: flex;
-      justify-content: space-between;
-      gap: 16px;
-      color: var(--muted);
-      border-bottom: 1px solid rgba(48,65,57,.55);
-      font-size: .88rem;
-    }
-    .room-meta strong { color: var(--ink); font-size: 1rem; }
-    .coord { color: var(--cyan); }
-
-    .room-view {
-      position: relative;
-      min-height: 390px;
-      display: grid;
-      place-items: end center;
-      perspective: 900px;
-      overflow: hidden;
-      background:
-        linear-gradient(115deg, transparent 0 48%, rgba(97,232,212,.055) 49%, transparent 51%),
-        linear-gradient(#17201e 0 68%, #101613 68%);
+      align-items: center;
+      justify-content: center;
+      transition: background-color .2s, box-shadow .2s;
     }
 
-    .room-view::before, .room-view::after {
-      content: "";
-      position: absolute;
-      top: 0; bottom: 32%;
-      width: 43%;
-      background: #111816;
-      border-color: #27332e;
-    }
-    .room-view::before { left: -26%; transform: skewY(25deg); border-right: 2px solid #27332e; }
-    .room-view::after { right: -26%; transform: skewY(-25deg); border-left: 2px solid #27332e; }
-
-    .ceiling-light {
-      position: absolute;
-      top: 8%; left: 50%;
-      width: 34%; height: 7px;
-      transform: translateX(-50%);
-      background: #cfe4da;
-      box-shadow: 0 0 35px 14px rgba(215,255,237,.12);
-      opacity: .72;
+    .wall.front {
+      inset: 21% 21% 35%;
+      background: linear-gradient(155deg, #262c29, #181c1a);
+      border: 1px solid #3b423e;
     }
 
-    .floor-lines {
-      position: absolute;
-      inset: 68% -10% 0;
-      background:
-        linear-gradient(90deg, transparent 49.8%, #26332c 50%, transparent 50.2%),
-        repeating-linear-gradient(90deg, transparent 0 12.4%, #1e2924 12.5%),
-        repeating-linear-gradient(0deg, transparent 0 23%, #1e2924 24%);
-      transform: perspective(320px) rotateX(52deg) scale(1.2);
-      transform-origin: bottom;
+    .wall.left {
+      inset: 0 79% 0 0;
+      clip-path: polygon(0 0, 100% 21%, 100% 65%, 0 100%);
+      background: linear-gradient(90deg, #101312, #222724);
+      border-right: 1px solid #343a37;
     }
 
-    .doors {
-      width: min(760px, 88%);
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: clamp(24px, 7vw, 100px);
-      align-items: end;
-      padding-bottom: 42px;
-      z-index: 3;
+    .wall.right {
+      inset: 0 0 0 79%;
+      clip-path: polygon(0 21%, 100% 0, 100% 100%, 0 65%);
+      background: linear-gradient(90deg, #222724, #101312);
+      border-left: 1px solid #343a37;
+    }
+
+    .wall.clue-wall {
+      background-color: rgba(230,255,74,.055);
+      box-shadow: inset 0 0 40px rgba(230,255,74,.065);
     }
 
     .door {
-      position: relative;
-      height: clamp(225px, 36vh, 340px);
-      padding: 0;
+      appearance: none;
+      position: absolute;
+      z-index: 4;
+      width: clamp(74px, 12vw, 116px);
+      height: clamp(152px, 25vw, 222px);
+      bottom: 0;
+      border: 1px solid #59605c;
+      border-radius: 2px 2px 0 0;
+      background:
+        radial-gradient(circle at 82% 51%, var(--acid) 0 3px, #545b54 4px 7px, transparent 8px),
+        linear-gradient(100deg, #1b201e, #0c0f0e);
       color: var(--ink);
       cursor: pointer;
-      border: 7px solid #34423b;
-      border-bottom-width: 10px;
-      background:
-        linear-gradient(90deg, rgba(255,255,255,.025), transparent 12% 88%, rgba(0,0,0,.18)),
-        #1c2723;
-      box-shadow: inset 0 0 0 1px #111915, 0 24px 30px rgba(0,0,0,.32);
-      transition: transform .12s, border-color .12s, filter .12s;
-      transform-origin: bottom;
+      box-shadow: inset 0 0 0 5px #131715, 0 0 0 1px #0b0d0c;
+      transition: filter .15s, transform .15s, border-color .15s;
     }
-    .door:hover { transform: scale(1.018); border-color: var(--cyan); filter: brightness(1.13); }
-    .door:active { transform: scale(.99); }
-    .door::before {
+
+    .door::after {
+      content: "推门";
+      position: absolute;
+      left: 50%;
+      bottom: 16px;
+      transform: translateX(-50%);
+      padding-top: 7px;
+      width: 58%;
+      border-top: 1px solid #626962;
+      color: #c7cbc3;
+      font-size: .78rem;
+      letter-spacing: .16em;
+    }
+
+    .door:hover, .door:focus-visible {
+      outline: none;
+      filter: brightness(1.28);
+      border-color: var(--acid);
+    }
+
+    .door:active { transform: scale(.985); }
+
+    .wall.left .door, .wall.right .door {
+      width: 78%;
+      height: 42%;
+      min-height: 154px;
+      bottom: 18%;
+    }
+
+    .wall.left .door { right: 4%; transform: skewY(-4deg); }
+    .wall.right .door { left: 4%; transform: skewY(4deg); }
+    .wall.left .door:active, .wall.right .door:active { transform: scale(.985); }
+
+    .entry-mark {
+      position: absolute;
+      z-index: 3;
+      left: 50%;
+      bottom: 11px;
+      width: min(250px, 48%);
+      height: 42px;
+      transform: translateX(-50%);
+      display: grid;
+      place-items: center;
+      color: var(--acid);
+      border-inline: 1px solid rgba(230,255,74,.5);
+      border-bottom: 3px solid var(--acid);
+      background: linear-gradient(transparent, rgba(230,255,74,.06));
+      font-size: .74rem;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+
+    .entry-mark::before,
+    .entry-mark::after {
       content: "";
       position: absolute;
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      background: var(--warning);
-      right: 17px; top: 53%;
-      box-shadow: 0 0 8px rgba(255,200,87,.45);
+      bottom: -3px;
+      width: 24px;
+      height: 3px;
+      background: var(--acid);
+      box-shadow: 0 0 12px rgba(230,255,74,.7);
     }
-    .door-key {
+    .entry-mark::before { left: 12%; }
+    .entry-mark::after { right: 12%; }
+
+    .room-caption {
       position: absolute;
-      left: 14px; top: 13px;
-      width: 29px; height: 29px;
-      display: grid; place-items: center;
-      border: 1px solid var(--muted);
+      z-index: 6;
+      top: 16px;
+      left: 18px;
+      padding: 8px 10px;
+      border-left: 2px solid var(--acid);
+      background: rgba(5,7,7,.74);
       color: var(--muted);
-      font-size: .8rem;
+      font-size: .78rem;
+      letter-spacing: .08em;
     }
-    .door-direction {
-      display: block;
-      font-size: clamp(2.2rem, 6vw, 4.2rem);
-      font-weight: 900;
-      letter-spacing: -.05em;
-    }
-    .door-name { display: block; margin-top: 8px; color: var(--muted); font-size: .92rem; letter-spacing: .18em; }
 
-    .prompt {
-      z-index: 3;
-      min-height: 92px;
-      padding: 17px 20px 18px;
-      border-top: 1px solid var(--line);
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 20px;
-      align-items: center;
-      background: #0d1315;
-    }
-    .prompt-main { font-size: 1rem; line-height: 1.55; }
-    .prompt-sub { color: var(--muted); margin-top: 5px; font-size: .82rem; }
-    .scan-chip { color: var(--cyan); border: 1px solid #28584f; padding: 9px 11px; white-space: nowrap; font-size: .78rem; }
-
-    .sidebar {
-      padding: 17px;
-      display: grid;
-      grid-template-rows: auto auto 1fr auto;
-      gap: 15px;
-    }
-    .side-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .side-head h2 { margin: 0; font-size: 1rem; letter-spacing: .12em; }
-    .live-mark { color: var(--acid); font-size: .75rem; }
-    .live-mark::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: currentColor; }
-
-    .map-frame { border: 1px solid var(--line); background: #080c0e; padding: 8px; }
-    #map { display: block; width: 100%; height: auto; aspect-ratio: 5 / 4; }
-    .map-legend { display: flex; flex-wrap: wrap; gap: 10px 14px; color: var(--muted); font-size: .7rem; margin-top: 9px; }
-    .legend-swatch { display: inline-block; width: 9px; height: 9px; margin-right: 5px; vertical-align: -1px; }
-
-    .notes { min-height: 0; border-top: 1px solid var(--line); padding-top: 14px; }
-    .notes h3 { margin: 0 0 11px; color: var(--muted); font-size: .76rem; letter-spacing: .13em; font-weight: 500; }
-    .notes ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
-    .notes li { padding-left: 16px; position: relative; line-height: 1.35; font-size: .82rem; }
-    .notes li::before { content: ">"; color: var(--acid); position: absolute; left: 0; }
-
-    .side-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
-    .ghost, .solid {
-      min-height: 42px;
-      padding: 8px 12px;
-      border: 1px solid var(--line);
-      color: var(--ink);
-      background: transparent;
-      cursor: pointer;
-    }
-    .ghost:hover { border-color: var(--cyan); color: var(--cyan); }
-    .solid { background: var(--acid); border-color: var(--acid); color: #0a0e0b; font-weight: 900; }
-    .solid:hover { filter: brightness(1.1); }
-
-    .footer {
+    .side {
       display: flex;
-      justify-content: space-between;
-      gap: 18px;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .measure, .observe-panel, .memory-note {
+      border: 1px solid var(--line);
+      background: rgba(18,22,21,.86);
+      padding: 18px;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
       color: var(--muted);
-      font-size: .74rem;
+      font-size: .72rem;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+
+    .dimension {
+      margin: 0;
+      font-family: ui-monospace, "Cascadia Mono", monospace;
+      font-size: clamp(1.7rem, 4vw, 2.45rem);
+      line-height: 1.1;
+      font-weight: 700;
+    }
+
+    .dimension small {
+      display: block;
+      margin-top: 8px;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: .72rem;
+      font-weight: 400;
+      letter-spacing: .06em;
+    }
+
+    .observe-panel { flex: 1; }
+
+    .observe-actions { display: grid; gap: 9px; }
+
+    .observe-button, .restart, .begin {
+      min-height: 48px;
+      border: 1px solid #525852;
+      background: #171b19;
+      color: var(--ink);
+      cursor: pointer;
+      letter-spacing: .04em;
+      transition: border-color .15s, color .15s, background .15s;
+    }
+
+    .observe-button:hover:not(:disabled),
+    .observe-button:focus-visible,
+    .restart:hover,
+    .restart:focus-visible,
+    .begin:hover,
+    .begin:focus-visible {
+      outline: none;
+      border-color: var(--acid);
+      color: var(--acid);
+    }
+
+    .observe-button:disabled { opacity: .34; cursor: default; }
+
+    .cost { color: var(--danger); font-family: ui-monospace, monospace; }
+
+    .clues {
+      margin-top: 14px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .clue {
+      margin: 0;
+      padding: 12px;
+      border-left: 2px solid var(--acid);
+      background: #0c0f0e;
+      color: #d9dcd4;
+      line-height: 1.65;
+      font-size: .92rem;
+      animation: reveal .24s ease-out both;
+    }
+
+    @keyframes reveal { from { opacity: 0; transform: translateY(5px); } }
+
+    .memory-note {
+      color: var(--muted);
+      font-size: .82rem;
+      line-height: 1.6;
     }
 
     .overlay {
       position: fixed;
-      z-index: 50;
       inset: 0;
-      padding: 22px;
+      z-index: 20;
       display: grid;
       place-items: center;
-      background: rgba(3,6,7,.89);
-      backdrop-filter: blur(9px);
+      padding: 18px;
+      background: rgba(3,4,4,.9);
+      backdrop-filter: blur(7px);
     }
+
     .overlay[hidden] { display: none; }
-    .modal {
-      width: min(900px, 100%);
-      max-height: calc(100svh - 44px);
-      overflow: auto;
-      border: 1px solid #496157;
-      background: #0d1315;
-      box-shadow: 0 35px 100px #000;
+
+    .dialog {
+      width: min(620px, 100%);
+      border: 1px solid #49504c;
+      background: #0d100f;
+      box-shadow: 0 28px 90px rgba(0,0,0,.6);
+      padding: clamp(24px, 5vw, 46px);
     }
-    .modal-top { padding: 20px 24px 15px; border-bottom: 1px solid var(--line); }
-    .eyebrow { color: var(--acid); font-size: .78rem; letter-spacing: .18em; }
-    .modal h1 { margin: 9px 0 8px; font-size: clamp(2rem, 7vw, 4.5rem); line-height: .95; letter-spacing: -.055em; }
-    .modal-intro { color: var(--muted); line-height: 1.55; max-width: 64ch; }
-    .briefing {
+
+    .dialog h1, .dialog h2 {
+      margin: 0 0 12px;
+      font-size: clamp(2rem, 7vw, 4.25rem);
+      line-height: .98;
+      letter-spacing: -.04em;
+    }
+
+    .dialog h1 span { color: var(--acid); }
+
+    .dialog .intro {
+      margin: 0 0 22px;
+      color: #c8cbc4;
+      line-height: 1.7;
+    }
+
+    .facts {
       display: grid;
-      grid-template-columns: minmax(0, 1.1fr) minmax(260px, .9fr);
-      gap: 0;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1px;
+      margin: 18px 0;
+      background: var(--line);
+      border: 1px solid var(--line);
     }
-    .blueprint { padding: 24px; border-right: 1px solid var(--line); }
-    .blueprint svg { display: block; width: 100%; height: auto; background: #080c0e; }
-    .rules { padding: 24px; display: flex; flex-direction: column; }
-    .rules h2 { margin: 0 0 14px; font-size: .88rem; color: var(--muted); letter-spacing: .15em; }
-    .rules ol { margin: 0; padding-left: 1.2rem; line-height: 1.6; }
-    .rules li { margin-bottom: 9px; }
-    .rules .solid { margin-top: auto; min-height: 54px; font-size: 1rem; }
-    .memory-warning { color: var(--warning); margin: 15px 0 20px; font-size: .82rem; line-height: 1.5; }
 
-    .death-card, .win-card { width: min(560px, 100%); text-align: center; padding: 38px 28px; border: 1px solid var(--danger); background: #110b0c; box-shadow: 0 0 100px rgba(255,79,79,.12); }
-    .death-card .status { color: var(--danger); font-size: clamp(3rem, 12vw, 7.5rem); font-weight: 950; letter-spacing: -.06em; line-height: .85; }
-    .win-card { border-color: var(--acid); background: #0c120b; }
-    .win-card .status { color: var(--acid); font-size: clamp(2.5rem, 10vw, 6rem); font-weight: 950; letter-spacing: -.06em; line-height: .9; }
-    .death-reason, .win-copy { margin: 23px auto 12px; line-height: 1.55; }
-    .restart-line { color: var(--muted); font-size: .82rem; margin-bottom: 18px; }
-    .restart-progress { height: 3px; max-width: 260px; margin: 0 auto 18px; background: #32191b; overflow: hidden; }
-    .restart-progress i { display: block; height: 100%; background: var(--danger); animation: restart .95s linear forwards; }
+    .fact { padding: 14px; background: #111513; }
+    .fact small { display: block; color: var(--muted); margin-bottom: 5px; }
+    .fact strong { font-family: ui-monospace, monospace; font-size: 1.22rem; }
 
-    .flash { animation: sceneFlash .28s linear; }
-    @keyframes pulse { 50% { opacity: .55; } }
-    @keyframes restart { from { width: 0; } to { width: 100%; } }
-    @keyframes sceneFlash { 50% { filter: brightness(1.8); } }
+    .rules {
+      margin: 18px 0 24px;
+      padding-left: 1.2rem;
+      color: #c8cbc4;
+      line-height: 1.65;
+    }
 
-    @media (max-width: 900px) {
-      .shell { padding: 10px; }
+    .rules li + li { margin-top: 7px; }
+
+    .begin, .restart {
+      width: 100%;
+      min-height: 56px;
+      border-color: var(--acid);
+      background: var(--acid);
+      color: #090b0a;
+      font-weight: 800;
+    }
+
+    .begin:hover, .begin:focus-visible,
+    .restart:hover, .restart:focus-visible {
+      background: transparent;
+      color: var(--acid);
+    }
+
+    .death .dialog { border-color: rgba(255,75,66,.65); }
+    .death h2 { color: var(--danger); }
+    .end-meta { color: var(--muted); margin: 18px 0 24px; }
+    .end-meta strong { color: var(--ink); font-family: ui-monospace, monospace; }
+
+    .success .dialog { border-color: rgba(230,255,74,.65); }
+    .success h2 { color: var(--acid); }
+
+    .toast {
+      position: fixed;
+      z-index: 30;
+      left: 50%;
+      bottom: 26px;
+      transform: translate(-50%, 18px);
+      padding: 10px 14px;
+      background: #0c0f0e;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s, transform .18s;
+      font-size: .86rem;
+    }
+
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    @media (max-width: 760px) {
+      .app { padding-top: 8px; }
       .topbar { grid-template-columns: 1fr auto; }
-      .timer-wrap { grid-row: 2; grid-column: 1 / -1; width: 100%; padding: 8px 0 10px; }
-      .run-id { grid-column: 2; }
-      .game-grid { grid-template-columns: 1fr; }
-      .scene { min-height: 540px; }
-      .sidebar { grid-template-columns: minmax(220px, .8fr) minmax(260px, 1fr); grid-template-rows: auto 1fr auto; }
-      .side-head { grid-column: 1 / -1; }
-      .notes { border-top: 0; border-left: 1px solid var(--line); padding: 4px 0 0 15px; }
-      .side-actions { grid-column: 1 / -1; }
-      .briefing { grid-template-columns: 1fr; }
-      .blueprint { border-right: 0; border-bottom: 1px solid var(--line); }
-    }
-
-    @media (max-width: 560px) {
-      .shell { padding: 0; gap: 0; }
-      .topbar { padding: 11px 13px 4px; }
-      .game-grid { gap: 0; }
-      .scene, .sidebar { border-left: 0; border-right: 0; }
-      .scene { min-height: 500px; }
-      .room-meta { padding: 13px; font-size: .76rem; }
-      .doors { width: 92%; gap: 16px; padding-bottom: 30px; }
-      .door { height: 230px; border-width: 5px; }
-      .door-direction { font-size: 2.4rem; }
-      .prompt { grid-template-columns: 1fr; padding: 13px; min-height: 105px; gap: 8px; }
-      .scan-chip { display: none; }
-      .sidebar { grid-template-columns: 1fr; grid-template-rows: auto auto auto auto; padding: 13px; }
-      .notes { border-left: 0; border-top: 1px solid var(--line); padding: 13px 0 0; }
-      .footer { padding: 12px; flex-direction: column; gap: 5px; }
-      .overlay { padding: 10px; }
-      .modal-top, .blueprint, .rules { padding: 17px; }
+      .shell-record { grid-row: 2; grid-column: 1 / -1; justify-self: start; padding-bottom: 9px; }
+      .game { grid-template-columns: 1fr; }
+      .view { min-height: 430px; }
+      .side { display: grid; grid-template-columns: 1fr; }
+      .wall.front { inset-inline: 18%; }
+      .wall.left { right: 82%; }
+      .wall.right { left: 82%; }
+      .facts { grid-template-columns: 1fr; }
     }
 
     @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
     }
   </style>
 </head>
 <body>
-  <main class="shell" aria-label="空间迷宫游戏">
+  <main class="app" aria-live="polite">
     <header class="topbar">
-      <div class="brand">BOUNDARY <i>//</i> TEST 07</div>
-      <div class="timer-wrap" aria-live="polite">
-        <div id="timer" class="timer">18.0</div>
-        <div class="timer-bar"><div id="timerFill" class="timer-fill"></div></div>
+      <div class="project-mark">SHELL TEST</div>
+      <div class="shell-record">外部测量 <strong>18m × 9m</strong></div>
+      <div class="clock-wrap">
+        <span class="clock-label">门锁闭合</span>
+        <span id="clock">00:30</span>
       </div>
-      <div id="runId" class="run-id">RUN 001</div>
     </header>
 
-    <div class="game-grid">
-      <section id="scene" class="scene" aria-label="当前房间">
-        <div class="room-meta">
-          <div><strong id="roomLabel">房间 01 / 07</strong><br><span id="entryText">由南侧进入</span></div>
-          <div style="text-align:right">网格坐标<br><span id="coord" class="coord">X 00 · Y 03</span></div>
-        </div>
+    <section class="game" aria-label="当前房间">
+      <div class="view" id="roomView">
+        <div class="ceiling"></div>
+        <div class="floor"></div>
+        <div class="wall left" data-wall="left"></div>
+        <div class="wall front" data-wall="front"></div>
+        <div class="wall right" data-wall="right"></div>
+        <div class="entry-mark" aria-label="进入本房间的门在身后">ENTRY · 进入处</div>
+        <div class="room-caption">门在身后闭合。没有标记。</div>
+      </div>
 
-        <div class="room-view">
-          <div class="ceiling-light"></div>
-          <div class="floor-lines"></div>
-          <div id="doors" class="doors"></div>
-        </div>
+      <aside class="side">
+        <section class="measure">
+          <p class="eyebrow">当前空间 · 目测</p>
+          <p class="dimension"><span id="dimension">6m × 3m</span><small>横向 × 纵深</small></p>
+        </section>
 
-        <div class="prompt">
-          <div>
-            <div id="promptMain" class="prompt-main">每个房间为 4 × 4 米。选择下一扇门。</div>
-            <div id="promptSub" class="prompt-sub">建筑外轮廓、设备井与已发现区域不会改变。</div>
+        <section class="observe-panel">
+          <p class="eyebrow">原始观察</p>
+          <div class="observe-actions">
+            <button class="observe-button" id="observeButton">观察房间 <span class="cost">−5秒</span></button>
+            <button class="observe-button" id="detailButton" disabled>仔细观察 <span class="cost">−5秒</span></button>
           </div>
-          <div class="scan-chip">测距仪：4.0 m / 格</div>
-        </div>
-      </section>
+          <div class="clues" id="clues" aria-live="polite"></div>
+        </section>
 
-      <aside class="sidebar" aria-label="探索地图与现场记录">
-        <div class="side-head">
-          <h2>DISCOVERED MAP</h2>
-          <span class="live-mark">LIVE</span>
-        </div>
-        <div class="map-frame">
-          <svg id="map" viewBox="0 0 500 400" role="img" aria-label="自动绘制的已发现地图"></svg>
-          <div class="map-legend">
-            <span><i class="legend-swatch" style="background:#b8ff43"></i>当前位置</span>
-            <span><i class="legend-swatch" style="background:#29413a"></i>已发现</span>
-            <span><i class="legend-swatch" style="background:#4c2c31"></i>设备井</span>
-          </div>
-        </div>
-        <div class="notes">
-          <h3>固定现场信息</h3>
-          <ul>
-            <li>建筑内尺寸：20 × 16 米</li>
-            <li>标准房间：4 × 4 米</li>
-            <li>入口：南墙，距西墙 2 米</li>
-            <li>出口：北墙，距西墙 14 米</li>
-            <li>设备井：入口以北 4 米、以东 8 米</li>
-          </ul>
-        </div>
-        <div class="side-actions">
-          <button id="briefBtn" class="ghost" type="button">查看开局简报 [B]</button>
-          <button id="resetBtn" class="ghost" type="button" title="重置本轮">↻</button>
-        </div>
+        <div class="memory-note">系统不会记录路线、转向或结论。房间不会重叠；安全路径不会回到已经进入的空间。</div>
       </aside>
-    </div>
-
-    <footer class="footer">
-      <span>操作：点击门 / 数字键 1、2</span>
-      <span>规则：越界、撞入结构核心或返回已占用空间 = 立即死亡</span>
-    </footer>
+    </section>
   </main>
 
-  <section id="briefOverlay" class="overlay" aria-modal="true" role="dialog" aria-labelledby="briefTitle">
-    <div class="modal">
-      <div class="modal-top">
-        <div class="eyebrow">PRE-RUN SURVEY // 仅展示一次的建筑观察</div>
-        <h1 id="briefTitle">记住这栋楼。</h1>
-        <div class="modal-intro">你会进入连续的标准房间。门上的方向不是答案；建筑的尺寸、固定设备井和你走过的轨迹才是答案。</div>
+  <section class="overlay" id="briefing">
+    <div class="dialog">
+      <p class="eyebrow">试验前外部勘察</p>
+      <h1>记住<span>壳体</span>，再进去。</h1>
+      <p class="intro">你只看过建筑外部。进去后，不会有地图、方位或路线记录。每个判断都能从空间事实推出。</p>
+      <div class="facts">
+        <div class="fact"><small>矩形外壳</small><strong>18m × 9m</strong></div>
+        <div class="fact"><small>入口位置</small><strong>长边左端 3m</strong></div>
       </div>
-      <div class="briefing">
-        <div class="blueprint">
-          <svg viewBox="0 0 540 420" aria-label="建筑外部测量简图">
-            <defs>
-              <pattern id="grid" width="80" height="80" patternUnits="userSpaceOnUse">
-                <path d="M 80 0 L 0 0 0 80" fill="none" stroke="#20302a" stroke-width="1" stroke-dasharray="5 7"/>
-              </pattern>
-            </defs>
-            <rect x="70" y="50" width="400" height="320" fill="url(#grid)" stroke="#b8ff43" stroke-width="3"/>
-            <rect x="230" y="210" width="80" height="80" fill="#351d21" stroke="#ff4f4f" stroke-width="2"/>
-            <path d="M70 370h40 M90 370v28" stroke="#61e8d4" stroke-width="6"/>
-            <path d="M330 50h80 M370 50V22" stroke="#b8ff43" stroke-width="6"/>
-            <path d="M70 32h400 M70 25v14 M470 25v14" stroke="#85958e" stroke-width="2"/>
-            <path d="M48 50v320 M41 50h14 M41 370h14" stroke="#85958e" stroke-width="2"/>
-            <text x="270" y="22" text-anchor="middle" fill="#e7f4ed" font-size="18">20 m</text>
-            <text x="29" y="215" text-anchor="middle" fill="#e7f4ed" font-size="18" transform="rotate(-90 29 215)">16 m</text>
-            <text x="270" y="253" text-anchor="middle" fill="#ff7777" font-size="15">设备井</text>
-            <text x="90" y="416" text-anchor="middle" fill="#61e8d4" font-size="15">入口</text>
-            <text x="370" y="18" text-anchor="middle" fill="#b8ff43" font-size="15">出口</text>
-            <text x="464" y="397" text-anchor="end" fill="#85958e" font-size="13">每格 4 × 4 m</text>
-            <path d="M500 85v-28 M500 57l-8 12 M500 57l8 12" stroke="#e7f4ed" stroke-width="2"/>
-            <text x="500" y="47" text-anchor="middle" fill="#e7f4ed" font-size="14">N</text>
-          </svg>
-        </div>
-        <div class="rules">
-          <h2>测试规则</h2>
-          <ol>
-            <li>每间房有两扇门，倒计时结束即死亡。</li>
-            <li>任何错误门都会立即触发清除。</li>
-            <li>地图只记录你真正进入过的房间，不标答案。</li>
-            <li>抵达北墙出口即完成测试。</li>
-          </ol>
-          <div class="memory-warning">简报可以再次查看，但计时不会暂停。第一次进入前，计时尚未开始。</div>
-          <button id="startBtn" class="solid" type="button">进入建筑 [ENTER]</button>
-        </div>
-      </div>
+      <ul class="rules">
+        <li>入口中心距你面对建筑时的左侧转角约 3 米。</li>
+        <li>内部墙体都与外壳平行；房间不重叠，安全路径不循环。</li>
+        <li>真实窗户只会出现在外墙。门若通向壳体外、竖井或已占据空间，会立即处决。</li>
+        <li>观察只给原始迹象，每次消耗 5 秒；每个空间限时 30 秒。</li>
+      </ul>
+      <button class="begin" id="beginButton">进入试验</button>
     </div>
   </section>
 
-  <section id="deathOverlay" class="overlay" hidden aria-live="assertive">
-    <div class="death-card">
-      <div class="status">DEAD</div>
-      <div id="deathReason" class="death-reason">所选位置超出建筑边界。</div>
-      <div class="restart-line">快速重建测试空间…</div>
-      <div class="restart-progress"><i></i></div>
-      <button id="retryBtn" class="ghost" type="button">立即重试 [ENTER]</button>
+  <section class="overlay death" id="deathOverlay" hidden>
+    <div class="dialog">
+      <p class="eyebrow">连接中断</p>
+      <h2>GAME OVER</h2>
+      <p class="intro">门后的内容已从记录中抹除。</p>
+      <p class="end-meta">生存时间　<strong id="survivalTime">00:00</strong></p>
+      <button class="restart" id="restartButton">立即重试 · R</button>
     </div>
   </section>
 
-  <section id="winOverlay" class="overlay" hidden aria-modal="true" role="dialog">
-    <div class="win-card">
-      <div class="status">EXIT FOUND</div>
-      <div id="winCopy" class="win-copy">你用空间记录穿过了 7 个房间。</div>
-      <button id="againBtn" class="solid" type="button">再次测试</button>
+  <section class="overlay success" id="successOverlay" hidden>
+    <div class="dialog">
+      <p class="eyebrow">外壳密封解除</p>
+      <h2>你出来了。</h2>
+      <p class="intro">没有地图。没有答案。只有你记住的空间。</p>
+      <p class="end-meta">用时　<strong id="clearTime">00:00</strong></p>
+      <button class="restart" id="againButton">再走一次 · R</button>
     </div>
   </section>
+
+  <div class="toast" id="toast">观察耗时 5 秒</div>
 
   <script>
     (() => {
-      "use strict";
+      'use strict';
 
-      const ROOM_SECONDS = 18;
-      const route = [
-        { x:0, y:3, entered:"南", doors:[
-          { dir:"西", arrow:"←", correct:false, reason:"西门落在建筑外墙之外。建筑西边界已经在你身后。" },
-          { dir:"东", arrow:"→", correct:true }
-        ]},
-        { x:1, y:3, entered:"西", doors:[
-          { dir:"南", arrow:"↓", correct:false, reason:"南门会穿过建筑外墙。这里已经是最南一排房间。" },
-          { dir:"北", arrow:"↑", correct:true }
-        ]},
-        { x:1, y:2, entered:"南", doors:[
-          { dir:"东", arrow:"→", correct:false, reason:"东侧 4 米处是简报标出的固定设备井。那里不可能存在房间。" },
-          { dir:"北", arrow:"↑", correct:true }
-        ]},
-        { x:1, y:1, entered:"南", doors:[
-          { dir:"南", arrow:"↓", correct:false, reason:"南门会回到已占用的上一房间；门后宣称的新空间与现有地图重叠。" },
-          { dir:"东", arrow:"→", correct:true }
-        ]},
-        { x:2, y:1, entered:"西", doors:[
-          { dir:"南", arrow:"↓", correct:false, reason:"南侧正是固定设备井。你在简报和地图上都见过它的位置。" },
-          { dir:"东", arrow:"→", correct:true }
-        ]},
-        { x:3, y:1, entered:"西", doors:[
-          { dir:"西", arrow:"←", correct:false, reason:"西门后的坐标已经被上一房间占用。空间会发生重叠。" },
-          { dir:"北", arrow:"↑", correct:true }
-        ]},
-        { x:3, y:0, entered:"南", doors:[
-          { dir:"南", arrow:"↓", correct:false, reason:"南门指回已占用房间。出口位于北墙，距西墙 14 米。" },
-          { dir:"北", arrow:"↑", correct:true, exit:true }
-        ]}
+      // The route is authored as six current-room views only. Nothing in the UI
+      // stores, draws, names, or reveals the player's path.
+      const rooms = [
+        {
+          dimensions: '6m × 3m',
+          doors: ['left', 'front'],
+          safe: 'front',
+          clueWall: 'left',
+          clue: '左手墙的窄窗外能看见雨。窗框与入口外墙使用同一种铆钉。',
+          detail: '入口留在身后正中；从入口中心到左侧转角，目测正好是半个房间宽。'
+        },
+        {
+          dimensions: '6m × 6m',
+          doors: ['front', 'right'],
+          safe: 'right',
+          clueWall: 'front',
+          clue: '正前方门槛下渗入一线雨水，风从门缝向室内压。',
+          detail: '前墙背面传来屋檐排水的连续敲击声；墙体温度明显低于两侧。'
+        },
+        {
+          dimensions: '6m × 3m',
+          doors: ['front', 'right'],
+          safe: 'front',
+          clueWall: 'right',
+          clue: '右手门缝里的气流持续向下。粉尘落入后，很久没有落地声。',
+          detail: '门框后没有水平地坪反光，只能看见一段竖直检修梯的影子。'
+        },
+        {
+          dimensions: '6m × 9m',
+          doors: ['front', 'right'],
+          safe: 'right',
+          clueWall: 'front',
+          clue: '正前墙的细缝里能看见室外警示灯，雨水沿玻璃向下流。',
+          detail: '前墙铆钉与入口外立面完全相同；门把手表面结着室外冷凝水。'
+        },
+        {
+          dimensions: '3m × 3m',
+          doors: ['left', 'right'],
+          safe: 'right',
+          clueWall: 'left',
+          clue: '左手墙的窄窗正对雨幕；玻璃外没有楼板或相邻墙面。',
+          detail: '窗外能看见建筑侧面的落水管，它紧贴外壳转角向下延伸。'
+        },
+        {
+          dimensions: '3m × 6m',
+          doors: ['front', 'right'],
+          safe: 'front',
+          clueWall: 'right',
+          clue: '右手墙后传来刚才听过的双频风机声，振动节奏完全一致。',
+          detail: '墙根划痕与那间纵深很长的空间里，地坪接缝的高度和间距一致。'
+        }
       ];
 
-      const el = id => document.getElementById(id);
-      const timerEl = el("timer");
-      const timerFill = el("timerFill");
-      const roomLabel = el("roomLabel");
-      const entryText = el("entryText");
-      const coord = el("coord");
-      const doorsEl = el("doors");
-      const scene = el("scene");
-      const briefOverlay = el("briefOverlay");
-      const deathOverlay = el("deathOverlay");
-      const winOverlay = el("winOverlay");
+      const state = {
+        room: 0,
+        observed: false,
+        detailed: false,
+        playing: false,
+        deadline: 0,
+        startedAt: 0,
+        raf: 0,
+        toastTimer: 0
+      };
 
-      let roomIndex = 0;
-      let runNumber = 1;
-      let deaths = 0;
-      let remaining = ROOM_SECONDS;
-      let frame = null;
-      let deadline = 0;
-      let playing = false;
-      let dead = false;
-      let restartTimer = null;
+      const $ = (id) => document.getElementById(id);
+      const clock = $('clock');
+      const dimension = $('dimension');
+      const roomView = $('roomView');
+      const clues = $('clues');
+      const observeButton = $('observeButton');
+      const detailButton = $('detailButton');
+      const briefing = $('briefing');
+      const deathOverlay = $('deathOverlay');
+      const successOverlay = $('successOverlay');
+      const toast = $('toast');
 
-      function pad(n) { return String(n).padStart(2, "0"); }
+      function formatTime(seconds, tenths = false) {
+        const safe = Math.max(0, seconds);
+        const minutes = Math.floor(safe / 60);
+        const wholeSeconds = Math.floor(safe % 60);
+        const base = `${String(minutes).padStart(2, '0')}:${String(wholeSeconds).padStart(2, '0')}`;
+        return tenths ? `${base}.${Math.floor((safe % 1) * 10)}` : base;
+      }
+
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add('show');
+        window.clearTimeout(state.toastTimer);
+        state.toastTimer = window.setTimeout(() => toast.classList.remove('show'), 900);
+      }
+
+      function addDoor(position) {
+        const wall = roomView.querySelector(`[data-wall="${position}"]`);
+        const door = document.createElement('button');
+        door.className = 'door';
+        door.type = 'button';
+        door.dataset.position = position;
+        const relativeName = position === 'front' ? '眼前' : position === 'left' ? '左手边' : '右手边';
+        door.setAttribute('aria-label', `推开${relativeName}的门`);
+        door.addEventListener('click', () => chooseDoor(position));
+        wall.appendChild(door);
+      }
 
       function renderRoom() {
-        const room = route[roomIndex];
-        roomLabel.textContent = `房间 ${pad(roomIndex + 1)} / ${pad(route.length)}`;
-        entryText.textContent = `由${room.entered}侧进入 · 朝向固定为北`;
-        coord.textContent = `X ${pad(room.x)} · Y ${pad(room.y)}`;
-        doorsEl.replaceChildren();
+        const room = rooms[state.room];
+        dimension.textContent = room.dimensions;
+        clues.replaceChildren();
+        state.observed = false;
+        state.detailed = false;
+        observeButton.disabled = false;
+        detailButton.disabled = true;
 
-        room.doors.forEach((door, i) => {
-          const btn = document.createElement("button");
-          btn.type = "button";
-          btn.className = "door";
-          btn.setAttribute("aria-label", `${i + 1}号门，向${door.dir}`);
-          btn.innerHTML = `<span class="door-key">${i + 1}</span><span class="door-direction">${door.arrow}</span><span class="door-name">${door.dir}门</span>`;
-          btn.addEventListener("click", () => chooseDoor(i));
-          doorsEl.appendChild(btn);
-        });
+        roomView.querySelectorAll('.door').forEach((door) => door.remove());
+        roomView.querySelectorAll('.wall').forEach((wall) => wall.classList.remove('clue-wall'));
+        room.doors.forEach(addDoor);
 
-        el("promptMain").textContent = roomIndex === route.length - 1
-          ? "你在建筑最北一排。出口测量位置：北墙，距西墙 14 米。"
-          : "每个房间为 4 × 4 米。将新位置与边界、设备井和已走路线对照。";
-        el("promptSub").textContent = `已确认 ${roomIndex + 1} 个房间 · 当前距西墙 ${room.x * 4}–${(room.x + 1) * 4} 米`;
-        drawMap();
-        resetRoomTimer();
+        state.deadline = performance.now() + 30000;
+        clock.textContent = '00:30';
+        clock.classList.remove('urgent');
       }
 
-      function drawMap() {
-        const svg = el("map");
-        const ns = "http://www.w3.org/2000/svg";
-        svg.replaceChildren();
-
-        const make = (name, attrs, text) => {
-          const node = document.createElementNS(ns, name);
-          Object.entries(attrs || {}).forEach(([k,v]) => node.setAttribute(k, v));
-          if (text != null) node.textContent = text;
-          svg.appendChild(node);
-          return node;
-        };
-
-        make("rect", {x:25,y:25,width:450,height:350,fill:"#0a0f11",stroke:"#41584e","stroke-width":3});
-        for (let i=1;i<5;i++) make("line", {x1:25+i*90,y1:25,x2:25+i*90,y2:375,stroke:"#18231f","stroke-width":1,"stroke-dasharray":"5 8"});
-        for (let i=1;i<4;i++) make("line", {x1:25,y1:25+i*87.5,x2:475,y2:25+i*87.5,stroke:"#18231f","stroke-width":1,"stroke-dasharray":"5 8"});
-
-        const sx = 25 + 2*90, sy = 25 + 2*87.5;
-        make("rect", {x:sx+6,y:sy+6,width:78,height:75.5,fill:"#351e22",stroke:"#ff4f4f","stroke-width":1.5});
-        make("text", {x:sx+45,y:sy+47,fill:"#d36b74","font-size":12,"text-anchor":"middle"}, "设备井");
-
-        const discovered = route.slice(0, roomIndex + 1);
-        discovered.forEach((r, i) => {
-          if (i === 0) return;
-          const p = route[i-1];
-          make("line", {
-            x1:25+p.x*90+45, y1:25+p.y*87.5+43.75,
-            x2:25+r.x*90+45, y2:25+r.y*87.5+43.75,
-            stroke:"#61e8d4", "stroke-width":4, "stroke-linecap":"round"
-          });
-        });
-        discovered.forEach((r, i) => {
-          const x = 25 + r.x*90 + 5, y = 25 + r.y*87.5 + 5;
-          const current = i === roomIndex;
-          make("rect", {x,y,width:80,height:77.5,fill:current?"#b8ff43":"#233b34",stroke:current?"#e7f4ed":"#4f7768","stroke-width":current?3:1.5});
-          make("text", {x:x+40,y:y+40,fill:current?"#09100b":"#b8c9c0","font-size":15,"font-weight":700,"text-anchor":"middle","dominant-baseline":"middle"}, `R${i+1}`);
-        });
-
-        make("path", {d:"M25 375h38 M45 375v17",stroke:"#61e8d4","stroke-width":5,fill:"none"});
-        make("text", {x:45,y:414,fill:"#61e8d4","font-size":13,"text-anchor":"middle"}, "入口");
-        make("path", {d:"M295 25h80 M335 25V8",stroke:"#b8ff43","stroke-width":5,fill:"none"});
-        make("text", {x:335,y:399,fill:"#61736b","font-size":12,"text-anchor":"middle"}, "20m × 16m");
+      function spendFiveSeconds() {
+        state.deadline -= 5000;
+        showToast('观察耗时 5 秒');
+        if (state.deadline <= performance.now()) {
+          die();
+          return false;
+        }
+        updateClock();
+        return true;
       }
 
-      function resetRoomTimer() {
-        cancelAnimationFrame(frame);
-        remaining = ROOM_SECONDS;
-        deadline = performance.now() + ROOM_SECONDS * 1000;
-        paintTimer(remaining);
-        if (playing && !dead) frame = requestAnimationFrame(tick);
+      function observe() {
+        if (!state.playing || state.observed || !spendFiveSeconds()) return;
+        const room = rooms[state.room];
+        state.observed = true;
+        observeButton.disabled = true;
+        detailButton.disabled = false;
+        roomView.querySelector(`[data-wall="${room.clueWall}"]`).classList.add('clue-wall');
+        const p = document.createElement('p');
+        p.className = 'clue';
+        p.textContent = room.clue;
+        clues.appendChild(p);
       }
 
-      function paintTimer(value) {
-        timerEl.textContent = Math.max(0, value).toFixed(1);
-        timerFill.style.transform = `scaleX(${Math.max(0, value / ROOM_SECONDS)})`;
-        timerEl.classList.toggle("danger", value <= 5);
-        timerFill.style.background = value <= 5 ? "var(--danger)" : "var(--acid)";
+      function detailedObserve() {
+        if (!state.playing || !state.observed || state.detailed || !spendFiveSeconds()) return;
+        state.detailed = true;
+        detailButton.disabled = true;
+        const p = document.createElement('p');
+        p.className = 'clue';
+        p.textContent = rooms[state.room].detail;
+        clues.appendChild(p);
       }
 
-      function tick(now) {
-        if (!playing || dead) return;
-        remaining = (deadline - now) / 1000;
-        paintTimer(remaining);
-        if (remaining <= 0) {
-          die("倒计时归零。当前房间已封闭。", true);
+      function chooseDoor(position) {
+        if (!state.playing) return;
+        const room = rooms[state.room];
+        if (position !== room.safe) {
+          die();
           return;
         }
-        frame = requestAnimationFrame(tick);
-      }
 
-      function chooseDoor(index) {
-        if (!playing || dead) return;
-        const choice = route[roomIndex].doors[index];
-        if (!choice) return;
-        scene.classList.remove("flash");
-        void scene.offsetWidth;
-        scene.classList.add("flash");
-        if (!choice.correct) {
-          die(choice.reason, false);
-          return;
-        }
-        if (choice.exit) {
+        if (state.room === rooms.length - 1) {
           win();
           return;
         }
-        playing = false;
-        cancelAnimationFrame(frame);
-        setTimeout(() => {
-          roomIndex += 1;
-          playing = true;
-          renderRoom();
-        }, 170);
-      }
 
-      function die(reason, timeout) {
-        dead = true;
-        playing = false;
-        cancelAnimationFrame(frame);
-        deaths += 1;
-        el("deathReason").textContent = reason;
-        deathOverlay.hidden = false;
-        if (timeout) timerEl.textContent = "0.0";
-        clearTimeout(restartTimer);
-        restartTimer = setTimeout(restart, 950);
-      }
-
-      function restart() {
-        clearTimeout(restartTimer);
-        deathOverlay.hidden = true;
-        winOverlay.hidden = true;
-        runNumber += 1;
-        roomIndex = 0;
-        dead = false;
-        playing = true;
-        el("runId").textContent = `RUN ${String(runNumber).padStart(3, "0")}`;
+        state.room += 1;
         renderRoom();
       }
 
+      function updateClock() {
+        if (!state.playing) return;
+        const remaining = (state.deadline - performance.now()) / 1000;
+        if (remaining <= 0) {
+          clock.textContent = '00:00';
+          die();
+          return;
+        }
+        clock.textContent = formatTime(remaining, remaining < 10);
+        clock.classList.toggle('urgent', remaining < 8);
+        state.raf = requestAnimationFrame(updateClock);
+      }
+
+      function start() {
+        cancelAnimationFrame(state.raf);
+        state.room = 0;
+        state.playing = true;
+        state.startedAt = performance.now();
+        briefing.hidden = true;
+        deathOverlay.hidden = true;
+        successOverlay.hidden = true;
+        renderRoom();
+        state.raf = requestAnimationFrame(updateClock);
+        roomView.querySelector('.door')?.focus({ preventScroll: true });
+      }
+
+      function die() {
+        if (!state.playing) return;
+        state.playing = false;
+        cancelAnimationFrame(state.raf);
+        $('survivalTime').textContent = formatTime((performance.now() - state.startedAt) / 1000);
+        deathOverlay.hidden = false;
+        $('restartButton').focus({ preventScroll: true });
+      }
+
       function win() {
-        playing = false;
-        cancelAnimationFrame(frame);
-        el("winCopy").textContent = `你用空间记录穿过了 ${route.length} 个房间。本次测试死亡 ${deaths} 次。`;
-        winOverlay.hidden = false;
+        if (!state.playing) return;
+        state.playing = false;
+        cancelAnimationFrame(state.raf);
+        $('clearTime').textContent = formatTime((performance.now() - state.startedAt) / 1000);
+        successOverlay.hidden = false;
+        $('againButton').focus({ preventScroll: true });
       }
 
-      function begin() {
-        briefOverlay.hidden = true;
-        if (!playing && !dead && winOverlay.hidden) {
-          playing = true;
-          resetRoomTimer();
-        }
-      }
+      observeButton.addEventListener('click', observe);
+      detailButton.addEventListener('click', detailedObserve);
+      $('beginButton').addEventListener('click', start);
+      $('restartButton').addEventListener('click', start);
+      $('againButton').addEventListener('click', start);
 
-      function showBrief() {
-        briefOverlay.hidden = false;
-        el("startBtn").textContent = playing ? "返回当前房间 [ENTER]" : "进入建筑 [ENTER]";
-      }
-
-      el("startBtn").addEventListener("click", begin);
-      el("briefBtn").addEventListener("click", showBrief);
-      el("resetBtn").addEventListener("click", restart);
-      el("retryBtn").addEventListener("click", restart);
-      el("againBtn").addEventListener("click", restart);
-
-      document.addEventListener("keydown", e => {
-        if (e.key.toLowerCase() === "b" && briefOverlay.hidden && deathOverlay.hidden && winOverlay.hidden) {
-          showBrief();
-          return;
-        }
-        if (e.key === "Enter") {
-          if (!deathOverlay.hidden) restart();
-          else if (!winOverlay.hidden) restart();
-          else if (!briefOverlay.hidden) begin();
-          return;
-        }
-        if (briefOverlay.hidden && deathOverlay.hidden && winOverlay.hidden) {
-          if (e.key === "1") chooseDoor(0);
-          if (e.key === "2") chooseDoor(1);
-        }
+      document.addEventListener('keydown', (event) => {
+        if (event.key.toLowerCase() === 'r' && (!deathOverlay.hidden || !successOverlay.hidden)) start();
       });
 
-      renderRoom();
-      playing = false;
+      // Small deterministic surface for smoke-testing interaction without
+      // exposing any additional information inside the game itself.
+      window.__ROOM_MAZE_TEST__ = {
+        getState: () => ({ room: state.room, observed: state.observed, detailed: state.detailed, playing: state.playing }),
+        start,
+        observe,
+        detailedObserve,
+        chooseDoor
+      };
     })();
   </script>
 </body>
